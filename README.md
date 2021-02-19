@@ -2,7 +2,7 @@
 # sequentialread-caddy-config
 
 This application talks to the docker socket to get info about containers and then
-generates a caddy config, which it posts to Caddy 2 HTTP server by Let's Encrypt.
+generates a Caddy config, which it posts to Caddy 2 HTTP server (by Matt Holt, of Let's Encrypt fame).
 
 Yes I realize https://github.com/lucaslorentz/caddy-docker-proxy already does this :P 
 
