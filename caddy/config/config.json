@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "disabled": false,
+    "listen": "unix//caddysocket/caddy.sock",
+    "origins": ["localhost"],
+    "config": {
+      "persist": false
+    }
+  }
+}
