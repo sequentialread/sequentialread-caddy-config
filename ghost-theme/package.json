@@ -1,4 +1,9 @@
+
 {
-  "name": "Mneme",
-  "version": "0.3.4"
+  "name": "sequentialread",
+  "version": "0.1.0",
+  "config": {
+    "posts_per_page": 12
+  }
 }
+

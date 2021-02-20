@@ -3,15 +3,15 @@
 <article class="{{post_class}}">
     <div class="container limit-width">
 
-        {{#if cover}}
-        <div class="author-profile author-profile-cover" style="background-image: url('{{cover}}');">
+        {{#if cover_image}}
+        <div class="author-profile author-profile-cover" style="background-image: url('{{cover_image}}');">
         {{^}}
         <div class="author-profile">
         {{/if}}
 
             {{#if profile_image}}
             <div class="img-crop img-circle">
-                <div class="img" style="background-image: url('{{image_url profile_image}}');"></div>
+                <div class="img" style="background-image: url('{{profile_image}}');"></div>
             </div>
             {{/if}}
 

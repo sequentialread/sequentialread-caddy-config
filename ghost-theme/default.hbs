@@ -33,14 +33,14 @@
     {{ghost_head}}
 </head>
 
-{{#if @blog.cover}}
-<body class="{{body_class}} with-cover" style="background-image: url('{{@blog.cover}}');">
+{{#if @site.cover_image}}
+<body class="{{body_class}} with-cover" style="background-image: url('{{@site.cover_image}}');">
 {{else}}
 <body class="{{body_class}}">
 {{/if}}
 
-	{{#if @blog.cover}}
-	<nav class="navbar navbar-default" style="background-image: url('{{@blog.cover}}');">
+	{{#if @site.cover_image}}
+	<nav class="navbar navbar-default" style="background-image: url('{{@site.cover_image}}');">
 	{{else}}
 	<nav class="navbar navbar-default">
 	{{/if}}

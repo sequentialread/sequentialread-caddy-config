@@ -159,6 +159,7 @@ func IngressConfig() error {
 				port, _ := strconv.Atoi(matches[0][1])
 				labelType := matches[0][2]
 
+				// TODO if the container is stopped, just skip it..
 				if ipAddress == "" {
 					return fmt.Errorf(
 						"container %s has an ingress label '%s' but it doesn't have an IP address on the ingress network",

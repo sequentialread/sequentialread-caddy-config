@@ -7,7 +7,7 @@ services:
       - internet-access
       - sequentialread
       - gitea
-      - blog
+      - ghost
     ports:
       - "80:80"
       - "443:443"
@@ -62,13 +62,11 @@ services:
     restart: always
     networks:
       - sequentialread
-    secrets:
-      - pwm_s3_secret_access_key
     environment:
       - SEQUENTIAL_READ_PWM_S3_BUCKET_NAME=sequentialread-pwm
       - SEQUENTIAL_READ_PWM_S3_BUCKET_REGION=us-west-2
       - SEQUENTIAL_READ_PWM_AWS_ACCESS_KEY_ID=AKIAJHP3D55MARVAFOMQ
-      - SEQUENTIAL_READ_PWM_AWS_SECRET_ACCESS_KEY=pwm_s3_secret_access_key
+      - SEQUENTIAL_READ_PWM_AWS_SECRET_ACCESS_KEY=${PWM_S3_SECRET_ACCESS_KEY}
     volumes:
       - type: bind
         source: ./pwm/data
@@ -84,10 +82,8 @@ services:
     restart: always
     networks:
       - sequentialread
-    secrets:
-      - picopublish_password
     environment:
-      - PICO_PUBLISH_PASSWORD=picopublish_password
+      - PICO_PUBLISH_PASSWORD=${PICOPUBLISH_PASSWORD}
     volumes:
       - type: bind
         source: ./picopublish/data
@@ -109,41 +105,55 @@ services:
       sequentialread-8080-public-hostnames: "webclip.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
-  blog:
+  ghost:
     image: ghost:3.41-alpine
     restart: always
     networks:
-      - blog
+      - ghost
     volumes:
       - type: bind
-        source: ./blog
-        target: /var/lib/ghost
+        source: ./ghost
+        target: /var/lib/ghost/content
+    environment:
+      - NODE_ENV=production
+      - url=https://beta.sequentialread.com
+      - database__client=sqlite3 
+      - database__connection__filename=content/data/ghost-prod.db 
+      - database__useNullAsDefault=true
+      - database__debug=false
+      - mail__from=gitlab.sequentialread.com@gmail.com
+      - mail__transport=SMTP
+      - mail__options__host=smtp.gmail.com
+      - mail__options__port=465
+      - mail__options__auth__user=gitlab.sequentialread.com@gmail.com
+      - mail__options__auth__pass=${GMAIL_PASSWORD}
     labels:
-      sequentialread-8080-public-port: 443
-      sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "beta.sequentialread.com,www.beta.sequentialread.com"
-      sequentialread-8080-container-protocol: http
+      sequentialread-2368-public-port: 443
+      sequentialread-2368-public-protocol: https
+      sequentialread-2368-public-hostnames: "beta.sequentialread.com,www.beta.sequentialread.com"
+      sequentialread-2368-container-protocol: http
 
 
   comments:
-    image: sequentialread/comments:0.1.0
+    image: sequentialread/comments:0.1.4
     restart: always
     networks:
-      - blog
-    secrets:
-      - recaptcha_secret_key 
-      - comments_admin_password
-      - gmail_password
+      - ghost
     volumes:
       - type: bind
         source: ./comments
-        target: /usr/src/app/data
+        target: /app/data
     environment:
-      - RECAPTCHA_SECRET_KEY=recaptcha_secret_key
-      - COMMENTS_ADMIN_PASSWORD=comments_admin_password
-      - GMAIL_USER=gitlab.sequentialread.com@gmail.com
-      - GMAIL_PASSWORD=gmail_password
-      - EMAIL_NOTIFICATION_TARGET=forest.n.johnson@gmail.com
+      - COMMENTS_LISTEN_PORT=2369
+      - COMMENTS_CORS_ORIGINS=https://sequentialread.com,https://www.sequentialread.com,https://beta.sequentialread.com,https://www.beta.sequentialread.com
+      - COMMENTS_RECAPTCHA_SITE_KEY=6Le7MB4TAAAAAIIky6MbeT---DSCSXic3pQSTPLh
+      - COMMENTS_RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+      - COMMENTS_EMAIL_HOST=smtp.gmail.com
+      - COMMENTS_EMAIL_PORT=465
+      - COMMENTS_EMAIL_USER=gitlab.sequentialread.com@gmail.com
+      - COMMENTS_EMAIL_PASSWORD=${GMAIL_PASSWORD}
+      - COMMENTS_NOTIFICATION_TARGET=forest.n.johnson@gmail.com
+      - COMMENTS_ADMIN_PASSWORD=${COMMENTS_ADMIN_PASSWORD}
     labels:
       sequentialread-2369-public-port: 443
       sequentialread-2369-public-protocol: https
@@ -157,9 +167,6 @@ services:
       - "10022:10022"
     networks:
       - gitea
-    secrets:
-      - gitea_secret_key
-      - gitea_mariadb_gitea_password
     volumes:
       - type: bind
         source: ./gitea/data
@@ -171,12 +178,12 @@ services:
       - ROOT_URL=https://git.beta.sequentialread.com
       - DISABLE_REGISTRATION=true
       - INSTALL_LOCK=true
-      - SECRET_KEY=gitea_secret_key
+      - SECRET_KEY=${GITEA_SECRET_KEY}
       - DB_TYPE=mysql
       - DB_HOST=gitea-mariadb
       - DB_NAME=gitea
       - DB_USER=gitea
-      - DB_PASSWD=gitea_mariadb_gitea_password
+      - DB_PASSWD=${GITEA_MARIADB_GITEA_PASSWORD}
     depends_on:
       - gitea-mariadb
     labels:
@@ -189,18 +196,15 @@ services:
     restart: always
     networks:
       - gitea
-    secrets:
-      - gitea_mariadb_root_password
-      - gitea_mariadb_gitea_password
     volumes:
       - type: bind
         source: ./gitea-mariadb/
         target: /var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=gitea_mariadb_root_password
+      - MYSQL_ROOT_PASSWORD=${GITEA_MARIADB_ROOT_PASSWORD}
       - MYSQL_DATABASE=gitea
       - MYSQL_USER=gitea
-      - MYSQL_PASSWORD=gitea_mariadb_gitea_password
+      - MYSQL_PASSWORD=${GITEA_MARIADB_GITEA_PASSWORD}
 
 networks:
   internet-access:
@@ -211,27 +215,10 @@ networks:
   sequentialread:
     driver: bridge
     internal: true
-  blog:
+  ghost:
     driver: bridge
     internal: true
 
 volumes:
   caddy-socket-volume:
 
-secrets:
-  picopublish_password:
-    file: ./secrets/picopublish_password.txt
-  pwm_s3_secret_access_key:
-    file: ./secrets/pwm_s3_secret_access_key.txt
-  recaptcha_secret_key:
-    file: ./secrets/recaptcha_secret_key.txt
-  comments_admin_password:
-    file: ./secrets/comments_admin_password.txt
-  gmail_password:
-    file: ./secrets/gmail_password.txt
-  gitea_mariadb_root_password:
-    file: ./secrets/gitea_mariadb_root_password.txt
-  gitea_mariadb_gitea_password:
-    file: ./secrets/gitea_mariadb_gitea_password.txt
-  gitea_secret_key:
-    file: ./secrets/gitea_secret_key.txt
