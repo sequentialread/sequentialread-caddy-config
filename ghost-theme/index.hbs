@@ -1,0 +1,20 @@
+{{!< default}}
+
+<div class="spinner"></div>
+
+<section class="{{body_class}}">
+    <div class="container">
+        <div class="row grid">
+			{{#if posts}}
+				{{#foreach posts}}
+					{{> loop_post}}
+            	{{/foreach}}
+			{{else}}
+				{{> empty_posts}}
+			{{/if}}
+        </div>
+
+    </div>
+</section>
+
+{{pagination}}
