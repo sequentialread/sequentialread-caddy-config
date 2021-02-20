@@ -135,7 +135,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.4
+    image: sequentialread/comments:0.1.12
     restart: always
     networks:
       - ghost
