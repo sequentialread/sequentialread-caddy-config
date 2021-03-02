@@ -9,7 +9,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -60,7 +62,26 @@ type ContainerConfig struct {
 }
 
 type CaddyApp struct {
-	Servers map[string]*CaddyServer `json:"servers"`
+	//http app
+	Servers map[string]*CaddyServer `json:"servers,omitempty"`
+
+	//tls app
+	Automation *CaddyTLSAutomation `json:"automation,omitempty"`
+}
+
+type CaddyTLSAutomation struct {
+	Policies []CaddyTLSPolicy `json:"policies,omitempty"`
+}
+
+type CaddyTLSPolicy struct {
+	Subjects []string          `json:"subjects,omitempty"`
+	Issuers  []CaddyACMEIssuer `json:"issuers,omitempty"`
+}
+
+type CaddyACMEIssuer struct {
+	CA     string `json:"ca"`
+	Email  string `json:"email"`
+	Module string `json:"module"`
 }
 
 type CaddyServer struct {
@@ -108,12 +129,31 @@ type CaddyVarsRegexp struct {
 	Pattern string `json:"pattern,omitempty"`
 }
 
-const CADDY_SOCKET = "/caddysocket/caddy.sock"
-const DOCKER_SOCKET = "/var/run/docker.sock"
-const DOCKER_API_VERSION = "v1.40"
+var CADDY_SOCKET = "/caddysocket/caddy.sock"
+var DOCKER_SOCKET = "/var/run/docker.sock"
+var DOCKER_API_VERSION = "v1.40"
+var CADDY_ACME_DOMAINS_CSV = ""
+var CADDY_ACME_DOMAINS = []string{}
+var CADDY_ACME_ISSUER_URL = "https://acme-v02.api.letsencrypt.org/directory"
+var CADDY_ACME_CLIENT_EMAIL_ADDRESS = ""
+
 const POLLING_INTERVAL = time.Second * time.Duration(5)
 
 func main() {
+
+	CADDY_SOCKET = getEnvVar("$CADDY_SOCKET", CADDY_SOCKET)
+	DOCKER_SOCKET = getEnvVar("$DOCKER_SOCKET", DOCKER_SOCKET)
+	DOCKER_API_VERSION = getEnvVar("$DOCKER_API_VERSION", DOCKER_API_VERSION)
+	CADDY_ACME_DOMAINS_CSV = getEnvVar("$CADDY_ACME_DOMAINS_CSV", CADDY_ACME_DOMAINS_CSV)
+	CADDY_ACME_ISSUER_URL = getEnvVar("$CADDY_ACME_ISSUER_URL", CADDY_ACME_ISSUER_URL)
+	CADDY_ACME_CLIENT_EMAIL_ADDRESS = getEnvVar("$CADDY_ACME_CLIENT_EMAIL_ADDRESS", CADDY_ACME_CLIENT_EMAIL_ADDRESS)
+
+	CADDY_ACME_DOMAINS = strings.Split(CADDY_ACME_DOMAINS_CSV, ",")
+
+	if CADDY_ACME_ISSUER_URL == "" || CADDY_ACME_CLIENT_EMAIL_ADDRESS == "" || CADDY_ACME_DOMAINS_CSV == "" {
+		log.Printf("using default caddy zerossl configuration. Set the caddy acme environment variables to override this.")
+	}
+
 	for {
 		err := IngressConfig()
 		if err != nil {
@@ -214,6 +254,8 @@ func IngressConfig() error {
 		publicPorts[x.PublicPort] = append(publicPorts[x.PublicPort], x)
 	}
 
+	// TODO sort public ports once we get that far and have more than one
+
 	for port, containerConfigs := range publicPorts {
 		if port == 443 {
 
@@ -250,6 +292,29 @@ func IngressConfig() error {
 					},
 				},
 			}
+			if CADDY_ACME_ISSUER_URL != "" && CADDY_ACME_CLIENT_EMAIL_ADDRESS != "" && CADDY_ACME_DOMAINS_CSV != "" {
+				caddyConfig["tls"] = &CaddyApp{
+					Automation: &CaddyTLSAutomation{
+						Policies: []CaddyTLSPolicy{
+							CaddyTLSPolicy{
+								Subjects: CADDY_ACME_DOMAINS,
+								Issuers: []CaddyACMEIssuer{
+									CaddyACMEIssuer{
+										CA:     CADDY_ACME_ISSUER_URL,
+										Email:  CADDY_ACME_CLIENT_EMAIL_ADDRESS,
+										Module: "acme",
+									},
+								},
+							},
+						},
+					},
+				}
+			}
+
+			// sort them so that the json always comes out the same & easier to compare (canonical)
+			sort.Slice(containerConfigs, func(i, j int) bool {
+				return containerConfigs[i].ContainerName < containerConfigs[j].ContainerName
+			})
 
 			for _, container := range containerConfigs {
 				if container.PublicHostnames != "" {
@@ -291,7 +356,15 @@ func IngressConfig() error {
 
 	if !byteArraysEqual(caddyConfigBytes, previousCaddyConfigBytes) {
 
-		log.Printf("posting updated caddy config: %s\n\n", string(caddyConfigBytes))
+		log.Println("!byteArraysEqual(caddyConfigBytes, previousCaddyConfigBytes)")
+		log.Println(".")
+		log.Println(".")
+		log.Println(".")
+		log.Printf("==================================\nOLD\n%s\n\n", string(previousCaddyConfigBytes))
+		log.Printf("==================================\nNEW\n%s\n\n", string(caddyConfigBytes))
+		log.Println("")
+		log.Println("")
+		log.Println("")
 
 		caddyResponse, caddyResponseBytes, err := unixHTTP(
 			"POST", CADDY_SOCKET, "/config/apps", caddyConfigBytes,
@@ -381,4 +454,12 @@ func unixHTTP(method, socketFile, endpoint string, body []byte) (*http.Response,
 		return nil, nil, errors.Wrapf(err, "unixHTTP read error (%s)", socketFile)
 	}
 	return response, bytes, nil
+}
+
+func getEnvVar(expand, defaultValue string) string {
+	result := os.ExpandEnv(expand)
+	if result != "" {
+		return result
+	}
+	return defaultValue
 }
