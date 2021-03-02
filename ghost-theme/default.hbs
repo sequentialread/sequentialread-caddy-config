@@ -24,10 +24,6 @@
 
 	<script src="{{asset "libraries/less/less.min.js"}}"></script>
 
-  {{#is "post"}}
-		<script src='https://www.google.com/recaptcha/api.js?onload=grecaptchaReady&render=explicit'></script>
-		<link rel="stylesheet" href="https://comments.sequentialread.com/static/comments.css" charset="utf8" />
-	{{/is}}
 
 	{{! Ghost outputs important style and meta data with this tag }}
     {{ghost_head}}
@@ -80,7 +76,7 @@
     <script src="{{asset "libraries/bootstrap/js/bootstrap.min.js"}}"></script>
     <script src="{{asset "libraries/imagesloaded/imagesloaded.pkgd.min.js"}}"></script>
     <script src="{{asset "libraries/masonry/masonry.pkgd.min.js"}}"></script>
-	<script src="{{asset "libraries/prism/prism.js"}}"></script>
+	  <script src="{{asset "libraries/prism/prism.js"}}"></script>
     <script src="{{asset "js/index.js"}}"></script>
 </body>
 

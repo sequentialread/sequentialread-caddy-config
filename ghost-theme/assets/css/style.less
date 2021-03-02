@@ -115,12 +115,21 @@ body .navbar-default .navbar-brand:focus{
 	padding: 10px;
 }
 
+#sqr-comment-container {
+  
+}
+
 .comment .container {
-	border-top: 3px solid @default-background;
+	&.comment-header-container { 
+    border-top: 3px solid @default-background;
+
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
 
 	> h3, > h2, > h1, > h4 {
 		margin-top: 0;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     display: inline-block;
 	}
 }

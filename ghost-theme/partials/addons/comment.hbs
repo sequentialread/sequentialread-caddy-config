@@ -1,10 +1,17 @@
 
 
 <section class="comment">
-    <div
+    <div class="container comment-header-container limit-width">
+      <h3>Comments</h3>
+    </div>
+    <div 
       class="container limit-width"
       id="sqr-comment-container"
-      data-comments-url="https://comments.beta.sequentialread.com/api/{{id}}">
+      data-comments-url="https://comments.beta.sequentialread.com/"
+      data-comments-document-id="{{id}}"
+    >
     </div>
+
     <script src="https://comments.beta.sequentialread.com/static/comments.js"></script>
+    <script src="https://captcha.sequentialread.com/static/captcha.js"></script>
 </section>
