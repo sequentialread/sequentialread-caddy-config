@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,10 +11,10 @@ import (
 	"strings"
 
 	envOverride "git.sequentialread.com/forest/influx-style-env-override"
-	"github.com/hpcloud/tail"
 )
 
 type Config struct {
+	Debug                           bool
 	DomainAliases                   []*DomainAlias
 	IncludeDomainInKey              bool
 	IncludeMethodInKey              bool
@@ -47,6 +48,7 @@ type CaddyLog struct {
 type CaddyLogRequest struct {
 	URI     string              `json:"uri"`
 	Host    string              `json:"host"`
+	Proto   string              `json:"proto"`
 	Method  string              `json:"method"`
 	Headers map[string][]string `json:"headers"`
 }
@@ -61,31 +63,24 @@ func main() {
 	}
 	fmt.Fprintf(os.Stderr, "goatcounter-caddy-log-adapter using config: %s", string(bytez))
 
-	logTailer, err := tail.TailFile(os.Args[0], tail.Config{ReOpen: true, Follow: true})
-	if err != nil {
-		panic(err)
-	}
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
 
-	for line := range logTailer.Lines {
-		if line.Err != nil {
-			fmt.Fprintf(os.Stderr, "unable to read next log line because %s (line: '%s')", err, line.Text)
-			continue
-		}
-
+		lineText := scanner.Text()
 		var caddyLog CaddyLog
-		err := json.Unmarshal([]byte(line.Text), &caddyLog)
+		err := json.Unmarshal([]byte(lineText), &caddyLog)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to unmarshal log line because %s (line: '%s')", err, line.Text)
+			fmt.Fprintf(os.Stderr, "unable to unmarshal log line because %s (line: '%s')", err, lineText)
 			continue
 		}
 
-		referrer := ""
-		userAgent := ""
+		referer := "null"
+		userAgent := "null"
 		contentType := ""
 		if caddyLog.Request.Headers != nil {
-			referrerHeader, hasReferrerHeader := caddyLog.Request.Headers["Referrer"]
-			if hasReferrerHeader && len(referrerHeader) > 0 {
-				referrer = referrerHeader[0]
+			refererHeader, hasRefererHeader := caddyLog.Request.Headers["Referer"]
+			if hasRefererHeader && len(refererHeader) > 0 {
+				referer = refererHeader[0]
 			}
 			userAgentHeader, hasUserAgent := caddyLog.Request.Headers["User-Agent"]
 			if hasUserAgent && len(userAgentHeader) > 0 {
@@ -101,21 +96,32 @@ func main() {
 		}
 
 		if config.GlobalContentTypeBlacklist != nil && config.GlobalContentTypeBlacklist.MatchString(contentType) {
+			if config.Debug {
+				fmt.Fprintf(os.Stderr, "ignored contentType: %s; matched blacklist %s\n", contentType, config.GlobalContentTypeBlacklistRegex)
+			}
 			continue
 		}
-		var requestDomain *Domain
-		for _, domain := range config.Domains {
-			if domain.MatchHostname.MatchString(caddyLog.Request.Host) {
-				requestDomain = domain
-				break
+
+		requestDomain := (func() *Domain {
+			for _, domain := range config.Domains {
+				if domain.MatchHostname.MatchString(caddyLog.Request.Host) {
+					return domain
+				}
 			}
-		}
+			return nil
+		})()
+
 		uriQuery := config.URIQuery
+		contentTypeWhitelistForDebugLog := "<no domain matched>"
 		if requestDomain != nil {
+			contentTypeWhitelistForDebugLog = requestDomain.ContentTypeWhitelistRegex
 			if requestDomain.URIQuery != "" {
 				uriQuery = requestDomain.URIQuery
 			}
 			if !requestDomain.ContentTypeWhitelist.MatchString(contentType) {
+				if config.Debug {
+					fmt.Fprintf(os.Stderr, "ignored contentType: %s; not match %s\n", contentType, requestDomain.ContentTypeWhitelist)
+				}
 				continue
 			}
 		}
@@ -149,14 +155,20 @@ func main() {
 			key = fmt.Sprintf("/%s%s", host, key)
 		}
 
-		myCommonLog := strings.Replace(caddyLog.CommonLog, caddyLog.Request.URI, key, 1)
+		search := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, caddyLog.Request.URI, caddyLog.Request.Proto)
+		replace := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, key, caddyLog.Request.Proto)
 
-		toPrint := fmt.Sprintf("%s:%s \"%s\" \"%s\" ", caddyLog.Request.Host, myCommonLog, referrer, userAgent)
+		myCommonLog := strings.Replace(caddyLog.CommonLog, search, replace, 1)
+
+		toPrint := fmt.Sprintf("%s:%s \"%s\" \"%s\"\n", caddyLog.Request.Host, myCommonLog, referer, userAgent)
 
 		fmt.Fprintf(os.Stdout, toPrint)
-		fmt.Fprintf(os.Stderr, toPrint)
+		fmt.Fprintf(os.Stderr, " %s matched %s: %s", contentType, contentTypeWhitelistForDebugLog, toPrint)
 	}
 
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
 }
 
 func loadConfigFromFileAndEnvVars() *Config {

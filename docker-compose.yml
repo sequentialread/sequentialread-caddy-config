@@ -27,7 +27,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.7
+    image: sequentialread/caddy-config:0.0.8
     userns_mode: "host"
     networks:
       - sequentialread
@@ -44,16 +44,58 @@ services:
       - CADDY_ACME_ISSUER_URL=https://acme-v02.api.letsencrypt.org/directory
       - CADDY_ACME_CLIENT_EMAIL_ADDRESS=forest.n.johnson@gmail.com
 
+  goatcounter:
+    image: sequentialread/goatcounter:1.4.2-9
+    restart: always
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "/app/goatcounter migrate -createdb all && /app/goatcounter serve -tls none -listen '*:8080'"]
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./goatcounter/db
+        target: /app/db
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "goatcounter.beta.sequentialread.com"
+      sequentialread-8080-container-protocol: http
+
+  goatcounter-log-publisher:
+    image: sequentialread/goatcounter:1.4.2-23
+    restart: always
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site https://goatcounter.beta.sequentialread.com -format combined-vhost -- -"]
+    extra_hosts:
+      - "goatcounter.beta.sequentialread.com:172.17.0.1"
+    volumes:
+      - type: bind
+        source: ./goatcounter/db
+        target: /app/db
+      - type: bind
+        source: ./caddy/log
+        target: /caddylog
+    networks:
+      - caddy
+    environment:
+      - GOATCOUNTER_API_KEY=${GOATCOUNTER_API_KEY}
+      - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
+      - LOGADAPTER_DEBUG=false
+      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^((git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
+      - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
+      - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=goatcounter
+      - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=DROP_ALL
+
   pwm:
-    image: sequentialread/sequentialread-password-manager:0.1.7
+    image: sequentialread/sequentialread-password-manager:2.0.6
     restart: always
     networks:
       - sequentialread
     environment:
-      - SEQUENTIAL_READ_PWM_S3_BUCKET_NAME=sequentialread-pwm
-      - SEQUENTIAL_READ_PWM_S3_BUCKET_REGION=us-west-2
-      - SEQUENTIAL_READ_PWM_AWS_ACCESS_KEY_ID=AKIA2KUVW4EZLLC72AM5
-      - SEQUENTIAL_READ_PWM_AWS_SECRET_ACCESS_KEY=${PWM_S3_SECRET_ACCESS_KEY}
+      - SEQUENTIALREAD_PWM_BACKBLAZE_BUCKET_NAME=sequentialread-password-manager
+      - SEQUENTIALREAD_PWM_BACKBLAZE_BUCKET_REGION=us-west-000
+      - SEQUENTIALREAD_PWM_BACKBLAZE_ACCESS_KEY_ID=0003ea77f5997840000000015
+      - SEQUENTIALREAD_PWM_BACKBLAZE_SECRET_ACCESS_KEY=${PWM_BACKBLAZE_SECRET_ACCESS_KEY}
     volumes:
       - type: bind
         source: ./pwm/data/
@@ -65,7 +107,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.1.6
+    image: sequentialread/picopublish:0.1.7
     restart: always
     networks:
       - sequentialread
@@ -187,7 +229,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.41
+    image: sequentialread/comments:0.1.42
     restart: always
     networks:
       - caddy
