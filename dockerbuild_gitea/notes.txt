@@ -1,0 +1,1 @@
+gitea admin create-user --name forest --password $GITEA_FOREST_PASSWORD --admin --email forest.n.johnson@gmail.com

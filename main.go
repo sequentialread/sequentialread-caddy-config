@@ -85,8 +85,13 @@ type CaddyACMEIssuer struct {
 }
 
 type CaddyServer struct {
-	Listen []string     `json:"listen"`
-	Routes []CaddyRoute `json:"routes"`
+	Listen []string         `json:"listen"`
+	Routes []CaddyRoute     `json:"routes"`
+	Logs   *CaddyServerLogs `json:"logs"`
+}
+
+type CaddyServerLogs struct {
+	LoggerNames map[string]string `json:"logger_names"`
 }
 
 type CaddyRoute struct {
@@ -289,6 +294,11 @@ func IngressConfig() error {
 					"srv0": {
 						Listen: []string{":443"},
 						Routes: []CaddyRoute{fbclidRoute},
+						Logs: &CaddyServerLogs{
+							LoggerNames: map[string]string{
+								"*": "goatcounter",
+							},
+						},
 					},
 				},
 			}

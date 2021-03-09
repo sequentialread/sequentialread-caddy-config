@@ -6,5 +6,28 @@
     "config": {
       "persist": false
     }
+  },
+  "logging": {
+    "logs": {
+      "default": {
+        "exclude": [
+          "http.log.access.goatcounter"
+        ]
+      },
+      "goatcounter": {
+        "encoder": {
+          "format": "console"
+        },
+        "include": [
+          "http.log.access.goatcounter"
+        ],
+        "writer": {
+          "filename": "/var/log/caddy-goatcounter.log",
+          "output": "file",
+          "roll_keep": 10,
+          "roll_size_mb": 1
+        }
+      }
+    }
   }
 }

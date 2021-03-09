@@ -19,6 +19,9 @@ services:
       - type: bind
         source: ./caddy/data
         target: /data
+      - type: bind
+        source: ./caddy/log
+        target: /var/log
       - type: volume
         source: caddy-socket-volume
         target: /caddysocket

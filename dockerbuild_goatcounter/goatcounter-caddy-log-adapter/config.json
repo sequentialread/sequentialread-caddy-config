@@ -1,0 +1,22 @@
+{
+  "DomainAliases": [
+    {
+      "Search": "beta.sequentialread.com",
+      "Replace": "b.sqr"
+    },
+    {
+      "Search": "sequentialread.com",
+      "Replace": "sqr"
+    }
+  ],
+  "IncludeDomainInKey": true,
+  "IncludeSuccessOrFailureInKey": true,
+  "URIQuery": "drop",
+  "GlobalContentTypeBlacklistRegex": "(font/.*)|([^/]+/(javascript|css|less|sass))",
+  "Domains": [
+    {
+      "MatchHostnameRegex": "^(goatcounter|git|stream|pwm|captcha|comments\\.)?(beta\\.)?sequentialread.com",
+      "ContentTypeWhitelistRegex": "[^/]+/html"
+    }
+  ]
+}
