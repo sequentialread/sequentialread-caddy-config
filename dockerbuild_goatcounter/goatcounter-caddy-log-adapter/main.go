@@ -127,6 +127,14 @@ func main() {
 		}
 
 		key := caddyLog.Request.URI
+
+		if key == "favicon.ico" {
+			if config.Debug {
+				fmt.Fprint(os.Stderr, "ignored favicon.ico\n")
+			}
+			continue
+		}
+
 		if uriQuery == "drop" {
 			split := strings.Split(key, "?")
 			key = split[0]
