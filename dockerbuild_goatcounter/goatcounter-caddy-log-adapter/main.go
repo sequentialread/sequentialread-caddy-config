@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	envOverride "git.sequentialread.com/forest/influx-style-env-override"
+	isbot "zgo.at/isbot"
 )
 
 type Config struct {
@@ -21,6 +22,8 @@ type Config struct {
 	IncludeSuccessOrFailureInKey    bool
 	URIQuery                        string
 	GlobalContentTypeBlacklistRegex string
+	BlacklistURIs                   []string
+	AlwaysIncludeURIs               []string
 	GlobalContentTypeBlacklist      *regexp.Regexp `json:"-"`
 	Domains                         []*Domain
 }
@@ -46,11 +49,12 @@ type CaddyLog struct {
 }
 
 type CaddyLogRequest struct {
-	URI     string              `json:"uri"`
-	Host    string              `json:"host"`
-	Proto   string              `json:"proto"`
-	Method  string              `json:"method"`
-	Headers map[string][]string `json:"headers"`
+	RemoteAddr string              `json:"remote_addr"`
+	URI        string              `json:"uri"`
+	Host       string              `json:"host"`
+	Proto      string              `json:"proto"`
+	Method     string              `json:"method"`
+	Headers    map[string][]string `json:"headers"`
 }
 
 func main() {
@@ -95,9 +99,30 @@ func main() {
 			}
 		}
 
-		if config.GlobalContentTypeBlacklist != nil && config.GlobalContentTypeBlacklist.MatchString(contentType) {
+		canonicalURI := strings.Trim(strings.ToLower(caddyLog.Request.URI), "/?")
+		for _, blacklistedURI := range config.BlacklistURIs {
+			if canonicalURI == blacklistedURI {
+				if config.Debug {
+					fmt.Fprintf(os.Stderr, "%s: ignored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+				}
+				continue
+			}
+		}
+		alwaysInclude := (func(canonicalURI string) bool {
+			for _, alwaysIncludeURI := range config.AlwaysIncludeURIs {
+				if canonicalURI == alwaysIncludeURI {
+					if config.Debug {
+						fmt.Fprintf(os.Stderr, "%s: alwaysInclude %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+					}
+					return true
+				}
+			}
+			return false
+		})(canonicalURI)
+
+		if !alwaysInclude && config.GlobalContentTypeBlacklist != nil && config.GlobalContentTypeBlacklist.MatchString(contentType) {
 			if config.Debug {
-				fmt.Fprintf(os.Stderr, "ignored contentType: %s; matched blacklist %s\n", contentType, config.GlobalContentTypeBlacklistRegex)
+				fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; matched blacklist %s  ---  %s %s\n", caddyLog.Request.RemoteAddr, contentType, config.GlobalContentTypeBlacklistRegex, caddyLog.Request.Host, caddyLog.Request.URI)
 			}
 			continue
 		}
@@ -118,9 +143,9 @@ func main() {
 			if requestDomain.URIQuery != "" {
 				uriQuery = requestDomain.URIQuery
 			}
-			if !requestDomain.ContentTypeWhitelist.MatchString(contentType) {
+			if !alwaysInclude && !requestDomain.ContentTypeWhitelist.MatchString(contentType) {
 				if config.Debug {
-					fmt.Fprintf(os.Stderr, "ignored contentType: %s; not match %s\n", contentType, requestDomain.ContentTypeWhitelist)
+					fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; not match %s  -----  %s %s\n", caddyLog.Request.RemoteAddr, contentType, requestDomain.ContentTypeWhitelist, caddyLog.Request.Host, caddyLog.Request.URI)
 				}
 				continue
 			}
@@ -128,9 +153,12 @@ func main() {
 
 		key := caddyLog.Request.URI
 
-		if key == "favicon.ico" {
+		isPrefetch := isbot.Prefetch(caddyLog.Request.Headers)
+		isBotResult := isbot.UserAgent(userAgent)
+		isBotReason := getIsBotReason(isBotResult)
+		if !alwaysInclude && (isPrefetch || (isbot.Is(isBotResult))) {
 			if config.Debug {
-				fmt.Fprint(os.Stderr, "ignored favicon.ico\n")
+				fmt.Fprintf(os.Stderr, "%s: ignored cuz bot: userAgent: %s  isPrefetch: %t, isBotReason: %s\n", caddyLog.Request.RemoteAddr, userAgent, isPrefetch, isBotReason)
 			}
 			continue
 		}
@@ -171,7 +199,11 @@ func main() {
 		toPrint := fmt.Sprintf("%s:%s \"%s\" \"%s\"\n", caddyLog.Request.Host, myCommonLog, referer, userAgent)
 
 		fmt.Fprintf(os.Stdout, toPrint)
-		fmt.Fprintf(os.Stderr, " %s matched %s: %s", contentType, contentTypeWhitelistForDebugLog, toPrint)
+		if config.Debug {
+			fmt.Fprintf(os.Stderr, "%s: %s matched %s: isBotReason: %s %s", caddyLog.Request.RemoteAddr, contentType, contentTypeWhitelistForDebugLog, isBotReason, toPrint)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s matched %s: isBotReason: %s %s", contentType, contentTypeWhitelistForDebugLog, isBotReason, toPrint)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -229,4 +261,21 @@ func loadConfigFromFileAndEnvVars() *Config {
 	}
 
 	return config
+}
+
+func getIsBotReason(code uint8) string {
+	return map[uint8]string{
+		0:   "Known to not be a bot",
+		1:   "None of the rules matches, so probably not a bot",
+		2:   "Prefetch algorithm",
+		3:   "User-Agent appeared to contain a URL",
+		4:   "Known client library",
+		5:   "Known bot",
+		6:   "User-Agent string looks \"bot-ish\"",
+		7:   "User-Agent string is short",
+		150: "PhantomJS headless browser",
+		151: "Nightmare headless browser",
+		152: "Selenium headless browser",
+		153: "Generic WebDriver-based headless browser",
+	}[code]
 }

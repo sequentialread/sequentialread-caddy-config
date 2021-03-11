@@ -13,6 +13,8 @@
   "IncludeSuccessOrFailureInKey": true,
   "URIQuery": "drop",
   "GlobalContentTypeBlacklistRegex": "(font/.*)|([^/]+/(javascript|css|less|sass))",
+  "BlacklistURIs": ["favicon.ico"],
+  "AlwaysIncludeURIs": ["rss"],
   "Domains": [
     {
       "MatchHostnameRegex": "^(goatcounter|git|stream|pwm|captcha|comments\\.)?(beta\\.)?sequentialread.com",

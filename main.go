@@ -137,8 +137,6 @@ type CaddyVarsRegexp struct {
 var CADDY_SOCKET = "/caddysocket/caddy.sock"
 var DOCKER_SOCKET = "/var/run/docker.sock"
 var DOCKER_API_VERSION = "v1.40"
-var CADDY_ACME_DOMAINS_CSV = ""
-var CADDY_ACME_DOMAINS = []string{}
 var CADDY_ACME_ISSUER_URL = "https://acme-v02.api.letsencrypt.org/directory"
 var CADDY_ACME_CLIENT_EMAIL_ADDRESS = ""
 
@@ -149,13 +147,10 @@ func main() {
 	CADDY_SOCKET = getEnvVar("$CADDY_SOCKET", CADDY_SOCKET)
 	DOCKER_SOCKET = getEnvVar("$DOCKER_SOCKET", DOCKER_SOCKET)
 	DOCKER_API_VERSION = getEnvVar("$DOCKER_API_VERSION", DOCKER_API_VERSION)
-	CADDY_ACME_DOMAINS_CSV = getEnvVar("$CADDY_ACME_DOMAINS_CSV", CADDY_ACME_DOMAINS_CSV)
 	CADDY_ACME_ISSUER_URL = getEnvVar("$CADDY_ACME_ISSUER_URL", CADDY_ACME_ISSUER_URL)
 	CADDY_ACME_CLIENT_EMAIL_ADDRESS = getEnvVar("$CADDY_ACME_CLIENT_EMAIL_ADDRESS", CADDY_ACME_CLIENT_EMAIL_ADDRESS)
 
-	CADDY_ACME_DOMAINS = strings.Split(CADDY_ACME_DOMAINS_CSV, ",")
-
-	if CADDY_ACME_ISSUER_URL == "" || CADDY_ACME_CLIENT_EMAIL_ADDRESS == "" || CADDY_ACME_DOMAINS_CSV == "" {
+	if CADDY_ACME_ISSUER_URL == "" || CADDY_ACME_CLIENT_EMAIL_ADDRESS == "" {
 		log.Printf("using default caddy zerossl configuration. Set the caddy acme environment variables to override this.")
 	}
 
@@ -264,6 +259,12 @@ func IngressConfig() error {
 	for port, containerConfigs := range publicPorts {
 		if port == 443 {
 
+			allHostnames := []string{}
+			for _, container := range containerConfigs {
+				allHostnames = append(allHostnames, strings.Split(container.PublicHostnames, ",")...)
+			}
+			sort.Strings(allHostnames)
+
 			// facebook adds this ?fbclid=xyz request parameter whenever someone clicks a link
 			// this handler will match all requests that have this parameter
 			// and it will redirect to the same URI with the parameter removed
@@ -293,21 +294,21 @@ func IngressConfig() error {
 				Servers: map[string]*CaddyServer{
 					"srv0": {
 						Listen: []string{":443"},
-						Routes: []CaddyRoute{fbclidRoute},
 						Logs: &CaddyServerLogs{
 							LoggerNames: map[string]string{
 								"*": "goatcounter",
 							},
 						},
+						Routes: []CaddyRoute{fbclidRoute},
 					},
 				},
 			}
-			if CADDY_ACME_ISSUER_URL != "" && CADDY_ACME_CLIENT_EMAIL_ADDRESS != "" && CADDY_ACME_DOMAINS_CSV != "" {
+			if CADDY_ACME_ISSUER_URL != "" && CADDY_ACME_CLIENT_EMAIL_ADDRESS != "" {
 				caddyConfig["tls"] = &CaddyApp{
 					Automation: &CaddyTLSAutomation{
 						Policies: []CaddyTLSPolicy{
 							CaddyTLSPolicy{
-								Subjects: CADDY_ACME_DOMAINS,
+								Subjects: allHostnames,
 								Issuers: []CaddyACMEIssuer{
 									CaddyACMEIssuer{
 										CA:     CADDY_ACME_ISSUER_URL,

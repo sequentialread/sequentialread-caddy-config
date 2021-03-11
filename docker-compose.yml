@@ -27,7 +27,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.8
+    image: sequentialread/caddy-config:0.0.11
     userns_mode: "host"
     networks:
       - sequentialread
@@ -58,16 +58,17 @@ services:
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "goatcounter.beta.sequentialread.com"
+      sequentialread-8080-public-hostnames: "goatcounter.sequentialread.com,goatcounter.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
   goatcounter-log-publisher:
-    image: sequentialread/goatcounter:1.4.2-23
+    image: sequentialread/goatcounter:1.4.2-28
     restart: always
     entrypoint: ["/bin/sh"]
-    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site https://goatcounter.beta.sequentialread.com -format combined-vhost -- -"]
+    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site https://goatcounter.sequentialread.com -format combined-vhost -- -"]
     extra_hosts:
       - "goatcounter.beta.sequentialread.com:172.17.0.1"
+      - "goatcounter.sequentialread.com:172.17.0.1"
     volumes:
       - type: bind
         source: ./goatcounter/db
@@ -80,11 +81,55 @@ services:
     environment:
       - GOATCOUNTER_API_KEY=${GOATCOUNTER_API_KEY}
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
-      - LOGADAPTER_DEBUG=false
-      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^((git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
+      - LOGADAPTER_DEBUG=true
+      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=goatcounter
       - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=DROP_ALL
+
+  influxdb:
+    image: influxdb:1.8.4
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./influxdb/data/
+        target: /var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=sequentialread
+      - DOCKER_INFLUXDB_INIT_BUCKET=metrics
+    labels:
+      sequentialread-8086-public-port: 443
+      sequentialread-8086-public-protocol: https
+      sequentialread-8086-public-hostnames: "influxdb.sequentialread.com,influxdb.beta.sequentialread.com"
+      sequentialread-8086-container-protocol: http
+
+  grafana:
+    image: grafana/grafana:7.4.3
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./grafana/data/
+        target: /var/lib/grafana
+    environment:
+      - GF_SERVER_ROOT_URL=https://grafana.sequentialread.com
+      - GF_SERVER_ENABLE_GZIP=true
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+    labels:
+      sequentialread-3000-public-port: 443
+      sequentialread-3000-public-protocol: https
+      sequentialread-3000-public-hostnames: "grafana.sequentialread.com,grafana.beta.sequentialread.com"
+      sequentialread-3000-container-protocol: http
+
 
   pwm:
     image: sequentialread/sequentialread-password-manager:2.0.6
@@ -103,7 +148,7 @@ services:
     labels:
       sequentialread-8073-public-port: 443
       sequentialread-8073-public-protocol: https
-      sequentialread-8073-public-hostnames: "pwm.beta.sequentialread.com"
+      sequentialread-8073-public-hostnames: "pwm.sequentialread.com,pwm.beta.sequentialread.com"
       sequentialread-8073-container-protocol: http
 
   picopublish:
@@ -120,7 +165,7 @@ services:
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "picopublish.beta.sequentialread.com"
+      sequentialread-8080-public-hostnames: "picopublish.sequentialread.com,picopublish.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
   webclip:
@@ -131,7 +176,7 @@ services:
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "webclip.beta.sequentialread.com"
+      sequentialread-8080-public-hostnames: "webclip.sequentialread.com,webclip.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
 
@@ -164,7 +209,7 @@ services:
     labels:
       sequentialread-3000-public-port: 443
       sequentialread-3000-public-protocol: https
-      sequentialread-3000-public-hostnames: "git.beta.sequentialread.com"
+      sequentialread-3000-public-hostnames: "www.git.sequentialread.com,git.sequentialread.com,git.beta.sequentialread.com"
       sequentialread-3000-container-protocol: http
 
   gitea-mariadb:
@@ -196,7 +241,7 @@ services:
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "stream.beta.sequentialread.com"
+      sequentialread-8080-public-hostnames: "stream.sequentialread.com,stream.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
   ghost:
@@ -210,7 +255,7 @@ services:
         target: /var/lib/ghost/content
     environment:
       - NODE_ENV=production
-      - url=https://beta.sequentialread.com
+      - url=https://sequentialread.com
       - database__client=sqlite3 
       - database__connection__filename=content/data/ghost-prod.db 
       - database__useNullAsDefault=true
@@ -224,7 +269,7 @@ services:
     labels:
       sequentialread-2368-public-port: 443
       sequentialread-2368-public-protocol: https
-      sequentialread-2368-public-hostnames: "beta.sequentialread.com,www.beta.sequentialread.com"
+      sequentialread-2368-public-hostnames: "sequentialread.com,www.sequentialread.com,beta.sequentialread.com,www.beta.sequentialread.com"
       sequentialread-2368-container-protocol: http
 
 
@@ -239,7 +284,7 @@ services:
         target: /app/data
     environment:
       - COMMENTS_LISTEN_PORT=8080
-      - COMMENTS_BASE_URL=https://comments.beta.sequentialread.com
+      - COMMENTS_BASE_URL=https://comments.sequentialread.com
       - COMMENTS_HASH_SALT=klnv5ii043nbkjz__g34nnk_34wgn26lqlwqb7841mf
       - COMMENTS_CORS_ORIGINS=https://sequentialread.com,https://www.sequentialread.com,https://beta.sequentialread.com,https://www.beta.sequentialread.com
       - COMMENTS_CAPTCHA_API_TOKEN=${CAPTCHA_API_TOKEN}
@@ -254,22 +299,26 @@ services:
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "comments.beta.sequentialread.com"
+      sequentialread-8080-public-hostnames: "comments.sequentialread.com,comments.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
 
 
 
   captcha:
-    image: sequentialread/pow-captcha:0.0.9
+    image: sequentialread/pow-captcha:0.0.10
     restart: always
     networks:
       - caddy
+    volumes:
+      - type: bind
+        source: ./captcha/tokens
+        target: /app/PoW_Captcha_API_Tokens
     environment:
       - POW_CAPTCHA_ADMIN_API_TOKEN=${CAPTCHA_ADMIN_API_TOKEN}
     labels:
       sequentialread-2370-public-port: 443
       sequentialread-2370-public-protocol: https
-      sequentialread-2370-public-hostnames: "captcha.beta.sequentialread.com"
+      sequentialread-2370-public-hostnames: "captcha.sequentialread.com,captcha.beta.sequentialread.com"
       sequentialread-2370-container-protocol: http
 
 

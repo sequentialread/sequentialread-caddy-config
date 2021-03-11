@@ -1,3 +1,5 @@
 git.sequentialread.com/forest/influx-style-env-override v0.0.0-20161210012634-dad3f15fa3dd h1:hT6Yz1VyourG5ECUL6NT+fP/UHYDXFSa01OzWx/S5V4=
 git.sequentialread.com/forest/influx-style-env-override v0.0.0-20161210012634-dad3f15fa3dd/go.mod h1:ZzXXPBYB8N8aGzrHKrRVdVDE2yZSBddmmfzs/Kfft8M=
 git.sequentialread.com/forest/pkg-errors v0.9.2/go.mod h1:8TkJ/f8xLWFIAid20aoqgDZcCj9QQt+FU+rk415XO1w=
+zgo.at/isbot v0.0.0-20201217063241-a1aab44f6889 h1:80jNd8BRsWVEbIXtExGwVrR/9ck5XnwE08qfhbhBeSY=
+zgo.at/isbot v0.0.0-20201217063241-a1aab44f6889/go.mod h1:/w+LTWbHsV7G5fT41VnwM0kTdk1H/prynfMqaxcBWjA=
