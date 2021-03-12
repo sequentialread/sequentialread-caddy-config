@@ -28,12 +28,11 @@ services:
 
   caddy-config:
     image: sequentialread/caddy-config:0.0.11
-    userns_mode: "host"
     networks:
       - sequentialread
     volumes:
       - type: bind
-        source: /var/run/docker.sock
+        source: ./security-gateway/docker.sock
         target: /var/run/docker.sock
         read_only: true
       - type: volume
@@ -80,7 +79,8 @@ services:
     entrypoint: ["/bin/sh"]
     command: ["-c", "/app/goatcounter migrate -createdb all && /app/goatcounter serve -tls none -listen '*:8080'"]
     networks:
-      - sequentialread
+      sequentialread:
+        ipv4_address: ${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}
     volumes:
       - type: bind
         source: ./goatcounter/db
@@ -95,10 +95,10 @@ services:
     image: sequentialread/goatcounter:1.4.2-28
     restart: always
     entrypoint: ["/bin/sh"]
-    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site https://goatcounter.sequentialread.com -format combined-vhost -- -"]
+    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com -format combined-vhost -- -"]
     extra_hosts:
-      - "goatcounter.beta.sequentialread.com:172.17.0.1"
-      - "goatcounter.sequentialread.com:172.17.0.1"
+      - "goatcounter.beta.sequentialread.com:${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}"
+      - "goatcounter.sequentialread.com:${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}"
     volumes:
       - type: bind
         source: ./goatcounter/db
@@ -107,7 +107,7 @@ services:
         source: ./caddy/log
         target: /caddylog
     networks:
-      - internet-access
+      - sequentialread
     environment:
       - GOATCOUNTER_API_KEY=${GOATCOUNTER_API_KEY}
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
@@ -140,12 +140,8 @@ services:
   telegraf: 
     image: telegraf:1.17.3
     restart: always
-    userns_mode: "host"
-    network_mode: "host"
-    user: 165536:165536
-    extra_hosts:
-      - "influxdb.beta.sequentialread.com:127.0.0.1"
-      - "influxdb.sequentialread.com:127.0.0.1"
+    networks:
+      - sequentialread
     command: ["--config", "/telegrafconfig/telegraf.conf"]
     volumes:
       - type: bind
@@ -165,10 +161,12 @@ services:
       - HOST_MOUNT_PREFIX=/hostfs
       - HOST_PROC=/hostfs/proc
       - TELEGRAF_INFLUX_PASSWORD=${TELEGRAF_INFLUX_PASSWORD}
-      - TELEGRAF_INFLUX_URL=https://influxdb.sequentialread.com/
+      - TELEGRAF_INFLUX_URL=http://influxdb:8086
 
   grafana:
     image: grafana/grafana:7.4.3
+    extra_hosts:
+      - "smtp.gmail.com:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - sequentialread
     volumes:
@@ -197,6 +195,20 @@ services:
       sequentialread-3000-public-protocol: https
       sequentialread-3000-public-hostnames: "grafana.sequentialread.com,grafana.beta.sequentialread.com"
       sequentialread-3000-container-protocol: http
+
+  sequentialread-external-service:
+    image: sequentialread/external-service:0.0.1
+    restart: always
+    networks:
+      sequentialread:
+        ipv4_address: ${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}
+      internet-access:
+    environment:
+      DEBUG_LOG: 'true'
+      SERVICE_0_LISTEN: ':465'
+      SERVICE_0_DIAL: 'smtp.gmail.com:465'
+      SERVICE_1_LISTEN: ':8080'
+      SERVICE_1_DIAL: '192.168.0.46:8080'
 
 
   pwm:
@@ -299,7 +311,9 @@ services:
     image: sequentialread/owncast-caching-proxy:0.0.17  
     networks:
       - sequentialread
-    command: 192.168.0.46:8080
+    extra_hosts:
+      - "forestslaptop:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
+    command: forestslaptop:8080
     volumes:
       - type: bind
         source: ./owncast-caching-proxy/cache
@@ -315,6 +329,8 @@ services:
   ghost:
     image: ghost:3.41-alpine
     restart: always
+    extra_hosts:
+      - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - blog
     volumes:
@@ -344,6 +360,9 @@ services:
   comments:
     image: sequentialread/comments:0.1.42
     restart: always
+    extra_hosts:
+      - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "captcha.sequentialread.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - blog
     volumes:
@@ -371,6 +390,19 @@ services:
       sequentialread-8080-container-protocol: http
 
 
+  blog-external-service:
+    image: sequentialread/external-service:0.0.1
+    restart: always
+    networks:
+      sequentialread:
+        ipv4_address: ${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}
+      internet-access:
+    environment:
+      DEBUG_LOG: 'true'
+      SERVICE_0_LISTEN: ':465'
+      SERVICE_0_DIAL: 'smtp.gmail.com:465'
+      SERVICE_1_LISTEN: ':443'
+      SERVICE_1_DIAL: '172.17.0.1:443'
 
   captcha:
     image: sequentialread/pow-captcha:0.0.10
@@ -394,15 +426,31 @@ services:
 networks:
   internet-access:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "${INTERNET_ACCESS_NETWORK_CIDR}"
   gitea:
     driver: bridge
     internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: "${GITEA_NETWORK_CIDR}"
   sequentialread:
     driver: bridge
     internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: "${SEQUENTIALREAD_NETWORK_CIDR}"
   blog:
     driver: bridge
     internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: "${BLOG_NETWORK_CIDR}"
 
 volumes:
   caddy-socket-volume:
