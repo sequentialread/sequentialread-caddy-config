@@ -310,10 +310,10 @@ services:
   stream:
     image: sequentialread/owncast-caching-proxy:0.0.17  
     networks:
-      - sequentialread
+      - internet-access
     extra_hosts:
       - "forestslaptop:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
-    command: forestslaptop:8080
+    command: 192.168.0.46:8080
     volumes:
       - type: bind
         source: ./owncast-caching-proxy/cache
