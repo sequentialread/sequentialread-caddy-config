@@ -4,7 +4,7 @@ services:
     image: caddy:2.3.0
     networks:
       - blog
-      - caddy
+      - internet-access
       - sequentialread
       - gitea
     ports:
@@ -44,6 +44,36 @@ services:
       - CADDY_ACME_ISSUER_URL=https://acme-v02.api.letsencrypt.org/directory
       - CADDY_ACME_CLIENT_EMAIL_ADDRESS=forest.n.johnson@gmail.com
 
+  docker-api-security-gateway:
+    image: sequentialread/docker-api-security-gateway:0.0.16
+    userns_mode: "host"
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+      - type: bind
+        source: ./security-gateway/
+        target: /var/run/docker-api-security-gateway/
+    environment:
+      DOCKER_API_PROXY_DEBUG: "false"
+      DOCKER_API_PROXY_ALLOW_0_METHODREGEX: ^GET$$
+      DOCKER_API_PROXY_ALLOW_0_URIREGEX: ^/info(\?)?$$
+      DOCKER_API_PROXY_ALLOW_1_METHODREGEX: ^GET$$
+      DOCKER_API_PROXY_ALLOW_1_URIREGEX: ^/containers/json(\?)?((filters=%7B%22status%22%3A%5B%22running%22%5D%7D&)?limit=0)?$$
+      DOCKER_API_PROXY_ALLOW_2_METHODREGEX: ^GET$$
+      DOCKER_API_PROXY_ALLOW_2_URIREGEX: ^/containers/[a-f0-9]+/stats(\?)?(stream=0)?$$
+      DOCKER_API_PROXY_ALLOW_3_METHODREGEX: ^GET$$
+      DOCKER_API_PROXY_ALLOW_3_URIREGEX: ^/containers/[a-f0-9]+/json(\?)?$$
+      DOCKER_API_PROXY_RESULTFILTERS_0_METHODREGEX: .*
+      DOCKER_API_PROXY_RESULTFILTERS_0_URIREGEX: ^/containers/[a-f0-9]+/json(\?)?$$
+      DOCKER_API_PROXY_RESULTFILTERS_0_BLACKLIST_0_PATH: .Config.Env
+      DOCKER_API_PROXY_HTTP_LISTENUNIXSOCKET: /var/run/docker-api-security-gateway/docker.sock
+      DOCKER_API_PROXY_HTTP_LISTENUNIXSOCKETUID: 165536
+      DOCKER_API_PROXY_HTTP_LISTENUNIXSOCKETGID: 165536
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DOCKER_API_VERSION: '1.40'
+
   goatcounter:
     image: sequentialread/goatcounter:1.4.2-9
     restart: always
@@ -77,11 +107,11 @@ services:
         source: ./caddy/log
         target: /caddylog
     networks:
-      - caddy
+      - internet-access
     environment:
       - GOATCOUNTER_API_KEY=${GOATCOUNTER_API_KEY}
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
-      - LOGADAPTER_DEBUG=true
+      - LOGADAPTER_DEBUG=false
       - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=goatcounter
@@ -95,18 +125,47 @@ services:
     volumes:
       - type: bind
         source: ./influxdb/data/
-        target: /var/lib/influxdb2
+        target: /var/lib/influxdb
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
-      - DOCKER_INFLUXDB_INIT_ORG=sequentialread
-      - DOCKER_INFLUXDB_INIT_BUCKET=metrics
+      - INFLUXDB_REPORTING_DISABLED=true
+      - INFLUXDB_HTTP_AUTH_ENABLED=true
+      - INFLUXDB_HTTP_PPROF_AUTH_ENABLED=true
+      - INFLUXDB_HTTP_DEBUG_PPROF_ENABLED=true
     labels:
       sequentialread-8086-public-port: 443
       sequentialread-8086-public-protocol: https
       sequentialread-8086-public-hostnames: "influxdb.sequentialread.com,influxdb.beta.sequentialread.com"
       sequentialread-8086-container-protocol: http
+
+  telegraf: 
+    image: telegraf:1.17.3
+    restart: always
+    userns_mode: "host"
+    network_mode: "host"
+    user: 165536:165536
+    extra_hosts:
+      - "influxdb.beta.sequentialread.com:127.0.0.1"
+      - "influxdb.sequentialread.com:127.0.0.1"
+    command: ["--config", "/telegrafconfig/telegraf.conf"]
+    volumes:
+      - type: bind
+        source: ./security-gateway/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: /
+        target: /hostfs
+        read_only: true
+      - type: bind
+        source: ./telegraf
+        target: /telegrafconfig
+        read_only: true
+    depends_on:
+      - docker-api-security-gateway
+    environment:
+      - HOST_MOUNT_PREFIX=/hostfs
+      - HOST_PROC=/hostfs/proc
+      - TELEGRAF_INFLUX_PASSWORD=${TELEGRAF_INFLUX_PASSWORD}
+      - TELEGRAF_INFLUX_URL=https://influxdb.sequentialread.com/
 
   grafana:
     image: grafana/grafana:7.4.3
@@ -117,13 +176,22 @@ services:
         source: ./grafana/data/
         target: /var/lib/grafana
     environment:
-      - GF_SERVER_ROOT_URL=https://grafana.sequentialread.com
-      - GF_SERVER_ENABLE_GZIP=true
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-      - GF_SECURITY_DISABLE_GRAVATAR=true
-      - GF_SECURITY_COOKIE_SECURE=true
-      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      GF_SERVER_ROOT_URL: 'https://grafana.sequentialread.com'
+      GF_SERVER_ENABLE_GZIP: 'true'
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+      GF_SECURITY_COOKIE_SECURE: 'true'
+      GF_SECURITY_SECRET_KEY: ${GRAFANA_SECRET_KEY}
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_NAME: sequentialread
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SMTP_ENABLED: 'true'
+      GF_SMTP_HOST: 'smtp.gmail.com:465'
+      GF_SMTP_PASSWORD: ${GMAIL_PASSWORD}
+      GF_SMTP_USER: gitlab.sequentialread.com@gmail.com
+      GF_SMTP_FROM_ADDRESS: gitlab.sequentialread.com@gmail.com
+      GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
     labels:
       sequentialread-3000-public-port: 443
       sequentialread-3000-public-protocol: https
@@ -230,7 +298,7 @@ services:
   stream:
     image: sequentialread/owncast-caching-proxy:0.0.17  
     networks:
-      - caddy
+      - sequentialread
     command: 192.168.0.46:8080
     volumes:
       - type: bind
@@ -277,7 +345,7 @@ services:
     image: sequentialread/comments:0.1.42
     restart: always
     networks:
-      - caddy
+      - blog
     volumes:
       - type: bind
         source: ./comments
@@ -308,7 +376,7 @@ services:
     image: sequentialread/pow-captcha:0.0.10
     restart: always
     networks:
-      - caddy
+      - blog
     volumes:
       - type: bind
         source: ./captcha/tokens
@@ -324,7 +392,7 @@ services:
 
 
 networks:
-  caddy:
+  internet-access:
     driver: bridge
   gitea:
     driver: bridge
@@ -338,4 +406,3 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
