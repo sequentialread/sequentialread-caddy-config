@@ -289,7 +289,7 @@ services:
   gitea:
     image: sequentialread/gitea-armv7:1.13.2 
     restart: always
-    mem_limit: 300m
+    mem_limit: 600m
     ports:
       - "10022:10022"
     networks:
