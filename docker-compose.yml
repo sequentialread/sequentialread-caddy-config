@@ -32,12 +32,13 @@ services:
       - sequentialread
     volumes:
       - type: bind
-        source: ./security-gateway/docker.sock
-        target: /var/run/docker.sock
+        source: ./security-gateway/
+        target: /dockersocket/
       - type: volume
         source: caddy-socket-volume
         target: /caddysocket
     environment:
+      - DOCKER_SOCKET=/dockersocket/docker.sock
       - CADDY_ACME_DOMAINS_CSV=*.sequentialread.com
       - CADDY_ACME_ISSUER_URL=https://acme-v02.api.letsencrypt.org/directory
       - CADDY_ACME_CLIENT_EMAIL_ADDRESS=forest.n.johnson@gmail.com
@@ -94,7 +95,7 @@ services:
     image: sequentialread/goatcounter:1.4.2-28
     restart: always
     entrypoint: ["/bin/sh"]
-    command: ["-c", "tail -f /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com -format combined-vhost -- -"]
+    command: ["-c", "tail -F /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com:8080 -format combined-vhost -- -"]
     extra_hosts:
       - "goatcounter.beta.sequentialread.com:${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}"
       - "goatcounter.sequentialread.com:${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}"
@@ -111,9 +112,9 @@ services:
       - GOATCOUNTER_API_KEY=${GOATCOUNTER_API_KEY}
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
       - LOGADAPTER_DEBUG=false
-      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
+      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
-      - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=goatcounter
+      - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=DROP_ALL
 
   influxdb:
@@ -154,8 +155,8 @@ services:
     command: ["--config", "/telegrafconfig/telegraf.conf"]
     volumes:
       - type: bind
-        source: ./security-gateway/docker.sock
-        target: /var/run/docker.sock
+        source: ./security-gateway/
+        target: /dockersocket/
       - type: bind
         source: /
         target: /hostfs
@@ -169,6 +170,7 @@ services:
     environment:
       - HOST_MOUNT_PREFIX=/hostfs
       - HOST_PROC=/hostfs/proc
+      - TELEGRAF_DOCKER_SOCKET=/dockersocket/docker.sock
       - TELEGRAF_INFLUX_PASSWORD=${TELEGRAF_INFLUX_PASSWORD}
       - TELEGRAF_INFLUX_URL=https://influxdb.sequentialread.com
 
@@ -470,3 +472,4 @@ networks:
 
 volumes:
   caddy-socket-volume:
+
