@@ -34,7 +34,6 @@ services:
       - type: bind
         source: ./security-gateway/docker.sock
         target: /var/run/docker.sock
-        read_only: true
       - type: volume
         source: caddy-socket-volume
         target: /caddysocket
@@ -140,8 +139,18 @@ services:
   telegraf: 
     image: telegraf:1.17.3
     restart: always
-    networks:
-      - sequentialread
+    # in order to get telegraf to report the host's network io correctly,
+    # it has to run on the host network... and the only way to do that
+    # would be to disable the user namespace remap. so we manually set it to the 
+    # remapped UID and GID
+    userns_mode: "host"
+    network_mode: "host"
+    user: 165536:165536
+    # now that we are on the hosts network, in order to talk to influx we have to go in through the 
+    # front door: Caddy, which is listening on 80 and 443 on localhost.
+    extra_hosts:
+      - "influxdb.beta.sequentialread.com:127.0.0.1"
+      - "influxdb.sequentialread.com:127.0.0.1"
     command: ["--config", "/telegrafconfig/telegraf.conf"]
     volumes:
       - type: bind
@@ -161,10 +170,20 @@ services:
       - HOST_MOUNT_PREFIX=/hostfs
       - HOST_PROC=/hostfs/proc
       - TELEGRAF_INFLUX_PASSWORD=${TELEGRAF_INFLUX_PASSWORD}
-      - TELEGRAF_INFLUX_URL=http://influxdb:8086
+      - TELEGRAF_INFLUX_URL=https://influxdb.sequentialread.com
 
   grafana:
     image: grafana/grafana:7.4.3
+    # The Grafana docker container is missing the /etc/nsswitch.conf file which
+    # many things rely on in order to know how to properly look up domain names.
+    # See: https://github.com/gliderlabs/docker-alpine/issues/367
+    # without this file, grafana will only use the dns server to resolve names,
+    # it won't look at the /etc/hosts file at all. 
+    # Since grafana normally runs as a separate user, we have to override the container to run as root 1st
+    # so it can write the nsswitch.conf file, then run the grafana start script as the grafana user.
+    user: '0'
+    entrypoint: /bin/sh
+    command: ["-c", "echo 'hosts: files dns' > /etc/nsswitch.conf && su -s '/bin/sh' -c '/run.sh' grafana"]
     extra_hosts:
       - "smtp.gmail.com:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
@@ -197,7 +216,7 @@ services:
       sequentialread-3000-container-protocol: http
 
   sequentialread-external-service:
-    image: sequentialread/external-service:0.0.1
+    image: sequentialread/external-service:0.0.12
     restart: always
     networks:
       sequentialread:
@@ -209,7 +228,6 @@ services:
       SERVICE_0_DIAL: 'smtp.gmail.com:465'
       SERVICE_1_LISTEN: ':8080'
       SERVICE_1_DIAL: '192.168.0.46:8080'
-
 
   pwm:
     image: sequentialread/sequentialread-password-manager:2.0.6
@@ -308,12 +326,10 @@ services:
       - MYSQL_PASSWORD=${GITEA_MARIADB_GITEA_PASSWORD} 
 
   stream:
-    image: sequentialread/owncast-caching-proxy:0.0.17  
+    image: sequentialread/owncast-caching-proxy:0.0.18
     networks:
-      - internet-access
-    extra_hosts:
-      - "forestslaptop:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
-    command: 192.168.0.46:8080
+      - sequentialread
+    command: '${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}:8080'
     volumes:
       - type: bind
         source: ./owncast-caching-proxy/cache
@@ -358,7 +374,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.42
+    image: sequentialread/comments:0.1.45
     restart: always
     extra_hosts:
       - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
@@ -391,10 +407,10 @@ services:
 
 
   blog-external-service:
-    image: sequentialread/external-service:0.0.1
+    image: sequentialread/external-service:0.0.12
     restart: always
     networks:
-      sequentialread:
+      blog:
         ipv4_address: ${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}
       internet-access:
     environment:
@@ -405,7 +421,7 @@ services:
       SERVICE_1_DIAL: '172.17.0.1:443'
 
   captcha:
-    image: sequentialread/pow-captcha:0.0.10
+    image: sequentialread/pow-captcha:0.0.11
     restart: always
     networks:
       - blog
