@@ -113,6 +113,10 @@ type CaddyHandler struct {
 	//CaddyStaticResponseHandler
 	Headers    map[string][]string `json:"headers,omitempty"`
 	StatusCode int                 `json:"status_code,omitempty"`
+
+	//CaddyFileServerHandler
+	Root        string `json:"root,omitempty"`
+	Passthrough bool   `json:"pass_thru,omitempty"`
 }
 
 // https://caddyserver.com/docs/json/apps/http/servers/routes/handle/reverse_proxy/
@@ -136,6 +140,7 @@ type CaddyVarsRegexp struct {
 
 var CADDY_SOCKET = "/caddysocket/caddy.sock"
 var DOCKER_SOCKET = "/var/run/docker.sock"
+var FAVICON_DIRECTORY = "/srv/static"
 var DOCKER_API_VERSION = "v1.40"
 var CADDY_ACME_ISSUER_URL = "https://acme-v02.api.letsencrypt.org/directory"
 var CADDY_ACME_CLIENT_EMAIL_ADDRESS = ""
@@ -146,6 +151,7 @@ func main() {
 
 	CADDY_SOCKET = getEnvVar("$CADDY_SOCKET", CADDY_SOCKET)
 	DOCKER_SOCKET = getEnvVar("$DOCKER_SOCKET", DOCKER_SOCKET)
+	FAVICON_DIRECTORY = getEnvVar("$FAVICON_DIRECTORY", FAVICON_DIRECTORY)
 	DOCKER_API_VERSION = getEnvVar("$DOCKER_API_VERSION", DOCKER_API_VERSION)
 	CADDY_ACME_ISSUER_URL = getEnvVar("$CADDY_ACME_ISSUER_URL", CADDY_ACME_ISSUER_URL)
 	CADDY_ACME_CLIENT_EMAIL_ADDRESS = getEnvVar("$CADDY_ACME_CLIENT_EMAIL_ADDRESS", CADDY_ACME_CLIENT_EMAIL_ADDRESS)
@@ -331,6 +337,13 @@ func IngressConfig() error {
 				if container.PublicHostnames != "" {
 					newRoute := CaddyRoute{
 						Handle: []CaddyHandler{
+							// this handler is just here to standardize the favicon (or any other universal static file)
+							// across the sites
+							CaddyHandler{
+								Handler:     "file_server",
+								Root:        FAVICON_DIRECTORY,
+								Passthrough: true,
+							},
 							CaddyHandler{
 								Handler: "reverse_proxy",
 								Upstreams: []CaddyUpstream{

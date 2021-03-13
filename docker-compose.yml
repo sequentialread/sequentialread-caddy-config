@@ -13,6 +13,10 @@ services:
     command: ["/bin/sh", "-c", "rm -f /caddysocket/caddy.sock && caddy run -config /config/config.json"]
     volumes:
       - type: bind
+        source: ./caddy/static
+        target: /srv/static
+        read_only: true
+      - type: bind
         source: ./caddy/config
         target: /config
         read_only: true
@@ -27,7 +31,8 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.11
+    image: sequentialread/caddy-config:0.0.12
+    mem_limit: 50m
     networks:
       - sequentialread
     volumes:
@@ -45,6 +50,7 @@ services:
 
   docker-api-security-gateway:
     image: sequentialread/docker-api-security-gateway:0.0.16
+    mem_limit: 50m
     userns_mode: "host"
     volumes:
       - type: bind
@@ -283,6 +289,7 @@ services:
   gitea:
     image: sequentialread/gitea-armv7:1.13.2 
     restart: always
+    mem_limit: 300m
     ports:
       - "10022:10022"
     networks:
@@ -293,6 +300,9 @@ services:
         target: /data
     environment:
       - APP_NAME='SequentialRead Git'
+      - UI_META_AUTHOR='Forest Johnson (SequentialRead)'
+      - UI_META_DESCRIPTION='Forest's self-hosted git server for sequentialread.com'
+      - SERVER_LANDING_PAGE='explore'
       - SSH_PORT=10022
       - SSH_LISTEN_PORT=10022
       - ROOT_URL=https://git.beta.sequentialread.com
@@ -472,4 +482,3 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
