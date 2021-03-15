@@ -75,7 +75,9 @@ func main() {
 			if err != nil {
 				log.Printf("WARNING: SERVICE_%d_DIAL: can't connect to '%s' right now", i, dial)
 			}
-			defer testConnection.Close()
+			if testConnection != nil {
+				defer testConnection.Close()
+			}
 
 			services = append(services, Service{
 				Listen:  listenAddr,
