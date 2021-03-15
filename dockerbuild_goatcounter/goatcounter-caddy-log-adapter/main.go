@@ -22,9 +22,13 @@ type Config struct {
 	IncludeSuccessOrFailureInKey    bool
 	URIQuery                        string
 	GlobalContentTypeBlacklistRegex string
-	BlacklistURIs                   []string
-	AlwaysIncludeURIs               []string
-	GlobalContentTypeBlacklist      *regexp.Regexp `json:"-"`
+	BlacklistIPsCSV                 string
+	BlacklistURIRegexesCSV          string
+	AlwaysIncludeURIsCSV            string
+	BlacklistIPs                    []string         `json:"-"`
+	BlacklistURIRegexes             []*regexp.Regexp `json:"-"`
+	AlwaysIncludeURIs               []string         `json:"-"`
+	GlobalContentTypeBlacklist      *regexp.Regexp   `json:"-"`
 	Domains                         []*Domain
 }
 
@@ -100,14 +104,21 @@ func main() {
 		}
 
 		canonicalURI := strings.Trim(strings.ToLower(caddyLog.Request.URI), "/?")
-		for _, blacklistedURI := range config.BlacklistURIs {
-			if canonicalURI == blacklistedURI {
-				if config.Debug {
-					fmt.Fprintf(os.Stderr, "%s: ignored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+		blacklistedURI := (func(canonicalURI string) bool {
+			for _, blacklistedURIRegex := range config.BlacklistURIRegexes {
+				if blacklistedURIRegex.MatchString(canonicalURI) {
+					if config.Debug {
+						fmt.Fprintf(os.Stderr, "%s: BlacklistURIsIgnored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+					}
+					return true
 				}
-				continue
 			}
+			return false
+		})(canonicalURI)
+		if blacklistedURI {
+			continue
 		}
+
 		alwaysInclude := (func(canonicalURI string) bool {
 			for _, alwaysIncludeURI := range config.AlwaysIncludeURIs {
 				if canonicalURI == alwaysIncludeURI {
@@ -149,6 +160,21 @@ func main() {
 				}
 				continue
 			}
+		}
+
+		blacklistedIP := (func(remoteAddr string) bool {
+			for _, blacklistedIP := range config.BlacklistIPs {
+				if strings.HasPrefix(remoteAddr, blacklistedIP) {
+					if config.Debug {
+						fmt.Fprintf(os.Stderr, "%s: BlacklistIPsIgnored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+					}
+					return true
+				}
+			}
+			return false
+		})(caddyLog.Request.RemoteAddr)
+		if blacklistedIP {
+			continue
 		}
 
 		key := caddyLog.Request.URI
@@ -260,6 +286,14 @@ func loadConfigFromFileAndEnvVars() *Config {
 		config.GlobalContentTypeBlacklist = regexp.MustCompile(config.GlobalContentTypeBlacklistRegex)
 	}
 
+	regexStrings := parseConfigCSV(config.BlacklistURIRegexesCSV)
+	config.BlacklistURIRegexes = []*regexp.Regexp{}
+	for _, regexString := range regexStrings {
+		config.BlacklistURIRegexes = append(config.BlacklistURIRegexes, regexp.MustCompile(regexString))
+	}
+	config.AlwaysIncludeURIs = parseConfigCSV(config.AlwaysIncludeURIsCSV)
+	config.BlacklistIPs = parseConfigCSV(config.BlacklistIPsCSV)
+
 	return config
 }
 
@@ -278,4 +312,16 @@ func getIsBotReason(code uint8) string {
 		152: "Selenium headless browser",
 		153: "Generic WebDriver-based headless browser",
 	}[code]
+}
+
+func parseConfigCSV(in string) []string {
+	toReturn := []string{}
+	raw := strings.Split(in, ",")
+	for _, r := range raw {
+		trimmed := strings.TrimSpace(r)
+		if trimmed != "" {
+			toReturn = append(toReturn, trimmed)
+		}
+	}
+	return toReturn
 }
