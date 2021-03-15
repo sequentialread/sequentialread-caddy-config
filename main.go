@@ -401,7 +401,7 @@ func IngressConfig() error {
 
 	caddyResponseString := ""
 	_, caddyResponseBytes, err := unixHTTP(
-		caddyHTTPClient, "GET", "/config/apps", caddyConfigBytes,
+		caddyHTTPClient, CADDY_SOCKET, "GET", "/config/apps", caddyConfigBytes,
 	)
 	if err != nil {
 		caddyResponseString = string(caddyResponseBytes)
@@ -421,7 +421,7 @@ func IngressConfig() error {
 		log.Println("")
 
 		caddyResponse, caddyResponseBytes, err := unixHTTP(
-			caddyHTTPClient, "POST", "/config/apps", caddyConfigBytes,
+			caddyHTTPClient, CADDY_SOCKET, "POST", "/config/apps", caddyConfigBytes,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to call caddy admin api")
@@ -468,7 +468,7 @@ func ListDockerContainers() ([]DockerContainer, error) {
 func myDockerGet(endpoint string) ([]byte, error) {
 
 	response, bytes, err := unixHTTP(
-		dockerHTTPClient, "GET", fmt.Sprintf("/%s/%s", DOCKER_API_VERSION, endpoint), nil,
+		dockerHTTPClient, DOCKER_SOCKET, "GET", fmt.Sprintf("/%s/%s", DOCKER_API_VERSION, endpoint), nil,
 	)
 
 	if err != nil {
@@ -483,21 +483,21 @@ func myDockerGet(endpoint string) ([]byte, error) {
 	return bytes, nil
 }
 
-func unixHTTP(unixHTTPClient *http.Client, method, endpoint string, body []byte) (*http.Response, []byte, error) {
+func unixHTTP(unixHTTPClient *http.Client, socket, method, endpoint string, body []byte) (*http.Response, []byte, error) {
 	request, err := http.NewRequest(method, fmt.Sprintf("http://localhost%s", endpoint), bytes.NewReader(body))
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP %s could not create request object (%s)", endpoint, DOCKER_SOCKET)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s could not create request object (%s)", endpoint, socket)
 	}
 	if body != nil {
 		request.Header.Add("content-type", "application/json")
 	}
 	response, err := unixHTTPClient.Do(request)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP %s failed (%s)", endpoint, DOCKER_SOCKET)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s failed (%s)", endpoint, socket)
 	}
 	bytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP %s read error (%s)", endpoint, DOCKER_SOCKET)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s read error (%s)", endpoint, socket)
 	}
 	return response, bytes, nil
 }
