@@ -147,6 +147,9 @@ var CADDY_ACME_CLIENT_EMAIL_ADDRESS = ""
 
 const POLLING_INTERVAL = time.Second * time.Duration(5)
 
+var dockerHTTPClient *http.Client
+var caddyHTTPClient *http.Client
+
 func main() {
 
 	CADDY_SOCKET = getEnvVar("$CADDY_SOCKET", CADDY_SOCKET)
@@ -158,6 +161,24 @@ func main() {
 
 	if CADDY_ACME_ISSUER_URL == "" || CADDY_ACME_CLIENT_EMAIL_ADDRESS == "" {
 		log.Printf("using default caddy zerossl configuration. Set the caddy acme environment variables to override this.")
+	}
+
+	dockerHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", DOCKER_SOCKET)
+			},
+		},
+		Timeout: time.Second * time.Duration(5),
+	}
+
+	caddyHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", CADDY_SOCKET)
+			},
+		},
+		Timeout: time.Second * time.Duration(5),
 	}
 
 	for {
@@ -378,7 +399,16 @@ func IngressConfig() error {
 
 	caddyConfigBytes, _ := json.MarshalIndent(caddyConfig, "", "  ")
 
-	if !byteArraysEqual(caddyConfigBytes, previousCaddyConfigBytes) {
+	caddyResponseString := ""
+	_, caddyResponseBytes, err := unixHTTP(
+		caddyHTTPClient, "GET", "/config/apps", caddyConfigBytes,
+	)
+	if err != nil {
+		caddyResponseString = string(caddyResponseBytes)
+	}
+	caddyConfigIsEmpty := caddyResponseString == "null" || caddyResponseString == "[]"
+
+	if caddyConfigIsEmpty || !byteArraysEqual(caddyConfigBytes, previousCaddyConfigBytes) {
 
 		log.Println("!byteArraysEqual(caddyConfigBytes, previousCaddyConfigBytes)")
 		log.Println(".")
@@ -391,7 +421,7 @@ func IngressConfig() error {
 		log.Println("")
 
 		caddyResponse, caddyResponseBytes, err := unixHTTP(
-			"POST", CADDY_SOCKET, "/config/apps", caddyConfigBytes,
+			caddyHTTPClient, "POST", "/config/apps", caddyConfigBytes,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to call caddy admin api")
@@ -438,7 +468,7 @@ func ListDockerContainers() ([]DockerContainer, error) {
 func myDockerGet(endpoint string) ([]byte, error) {
 
 	response, bytes, err := unixHTTP(
-		"GET", DOCKER_SOCKET, fmt.Sprintf("/%s/%s", DOCKER_API_VERSION, endpoint), nil,
+		dockerHTTPClient, "GET", fmt.Sprintf("/%s/%s", DOCKER_API_VERSION, endpoint), nil,
 	)
 
 	if err != nil {
@@ -453,29 +483,21 @@ func myDockerGet(endpoint string) ([]byte, error) {
 	return bytes, nil
 }
 
-func unixHTTP(method, socketFile, endpoint string, body []byte) (*http.Response, []byte, error) {
-	unixHTTPClient := http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", socketFile)
-			},
-		},
-	}
-
+func unixHTTP(unixHTTPClient *http.Client, method, endpoint string, body []byte) (*http.Response, []byte, error) {
 	request, err := http.NewRequest(method, fmt.Sprintf("http://localhost%s", endpoint), bytes.NewReader(body))
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP could not create request object (%s)", socketFile)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s could not create request object (%s)", endpoint, DOCKER_SOCKET)
 	}
 	if body != nil {
 		request.Header.Add("content-type", "application/json")
 	}
 	response, err := unixHTTPClient.Do(request)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP failed (%s)", socketFile)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s failed (%s)", endpoint, DOCKER_SOCKET)
 	}
 	bytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "unixHTTP read error (%s)", socketFile)
+		return nil, nil, errors.Wrapf(err, "unixHTTP %s read error (%s)", endpoint, DOCKER_SOCKET)
 	}
 	return response, bytes, nil
 }
