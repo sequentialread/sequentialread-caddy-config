@@ -82,6 +82,23 @@
     <script src="{{asset "libraries/masonry/masonry.pkgd.min.js"}}"></script>
 	  <script src="{{asset "libraries/prism/prism.js"}}"></script>
     <script src="{{asset "js/index.js"}}"></script>
+    <script>
+      // Insert stream status into the blog nav :) 
+      fetch("https://stream.sequentialread.com/api/status").then(response => response.json(), () => null).then(json => {
+        if(json && json.online) {
+          const streamInfoMobile = "<span style=\"background: red;opacity: 1;font-weight: bold;color: white;font-size: 0.8em;padding: 0.2em;padding-bottom: 0.2em;border-radius: 0.3em;padding-bottom: 0.05em; position: relative;top: -0.2em;right: 1em;\">stream live now!</span>";
+          const streamInfoDesktop = "<span style=\"background: red;opacity: 1;font-weight: bold;color: white;font-size: 0.8em;padding: 0.2em;padding-bottom: 0.2em;border-radius: 0.3em;padding-bottom: 0.05em;margin-left: 0.3em;\">live now!</span>";
+
+          const navbarToggle = document.querySelector(".navbar-header .navbar-toggle");
+          const streamLink = Array.from(
+            document.querySelectorAll(".nav.navbar-nav a")).filter(x => x.textContent.includes("stream")
+          )[0];
+
+          navbarToggle.innerHTML = streamInfoMobile + navbarToggle.innerHTML;
+          streamLink.innerHTML += streamInfoDesktop;
+        }
+      });
+    </script>
 </body>
 
 </html>
