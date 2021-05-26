@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -12,9 +13,11 @@ import (
 )
 
 type Service struct {
-	Listen  *net.TCPAddr
-	Dial    *net.TCPAddr
-	Timeout time.Duration
+	ServiceID int
+	Listen    *net.TCPAddr
+	Dial      *net.TCPAddr
+	Dialer    *net.Dialer
+	SNI       string
 }
 
 func main() {
@@ -46,10 +49,11 @@ func main() {
 			log.Fatalf("DIAL_FROM value '%s' must be a TCP address. Try '<ip_address>:'\n\n", dialFromString)
 		}
 	}
-	services := []Service{}
+	servicesByPort := map[int][]Service{}
 	for i := 0; i < serviceCount; i++ {
 		listen := os.Getenv(fmt.Sprintf("SERVICE_%d_LISTEN", i))
 		dial := os.Getenv(fmt.Sprintf("SERVICE_%d_DIAL", i))
+		sni := os.Getenv(fmt.Sprintf("SERVICE_%d_SNI", i))
 		dialTimeout := os.Getenv(fmt.Sprintf("SERVICE_%d_DIAL_TIMEOUT", i))
 		if listen != "" && dial != "" {
 			if strings.Contains(listen, "localhost") || strings.Contains(listen, "127.0.0.1") {
@@ -79,27 +83,57 @@ func main() {
 				defer testConnection.Close()
 			}
 
-			services = append(services, Service{
-				Listen:  listenAddr,
-				Dial:    dialAddr,
-				Timeout: dialTimeoutDuration,
+			if _, has := servicesByPort[listenAddr.Port]; !has {
+				servicesByPort[listenAddr.Port] = []Service{}
+			}
+			if sni == "" {
+				for _, service := range servicesByPort[listenAddr.Port] {
+					if service.SNI == "" {
+						log.Fatalf("\nSERVICE_%d: Found multiple services listening on port %d with no SNI (Server Name Indication). this is not allowed.\n\n", i, listenAddr.Port)
+					}
+				}
+			}
+			servicesByPort[listenAddr.Port] = append(servicesByPort[listenAddr.Port], Service{
+				ServiceID: i,
+				Listen:    listenAddr,
+				Dial:      dialAddr,
+				Dialer: &net.Dialer{
+					Timeout:   dialTimeoutDuration,
+					LocalAddr: dialFromAddr,
+				},
+				SNI: sni,
 			})
 		}
 	}
 
-	for serviceId, service := range services {
-		service := service
-		serviceId := serviceId
-		go (func(serviceId int, service *Service) {
-			listener, err := net.ListenTCP("tcp", service.Listen)
-			dialer := net.Dialer{
-				Timeout:   service.Timeout,
-				LocalAddr: dialFromAddr,
-			}
+	for port, services := range servicesByPort {
+		port := port
+		services := services
+		go (func(port int, services []Service) {
+			listener, err := net.ListenTCP("tcp", services[0].Listen)
 			if err != nil {
 				panic(err)
 			}
-			log.Printf("Listening: %v  Proxying: %v\n\n", *service.Listen, *service.Dial)
+
+			serviceBySNI := map[string]Service{}
+			var defaultService Service
+
+			for _, service := range services {
+				if service.SNI == "" {
+					defaultService = service
+				} else {
+					serviceBySNI[service.SNI] = service
+				}
+			}
+			serviceStrings := []string{}
+			for k, v := range serviceBySNI {
+				serviceStrings = append(serviceStrings, fmt.Sprintf("sni='%s' -> %v", k, *v.Dial))
+			}
+			if defaultService.Dial != nil {
+				serviceStrings = append(serviceStrings, fmt.Sprintf("<default> -> %v", *defaultService.Dial))
+			}
+
+			log.Printf("Listening: %v  Proxying: [%s]\n\n", *services[0].Listen, strings.Join(serviceStrings, ", "))
 
 			connectionId := 0
 			for {
@@ -109,36 +143,64 @@ func main() {
 				}
 
 				connectionId++
-				myConnectionId := fmt.Sprintf("%d_%d", serviceId, connectionId)
 
-				go (func(myConnectionId string, clientConnection *net.TCPConn) {
+				connectionHeader := make([]byte, 1024)
+				n, err := clientConnection.Read(connectionHeader)
+				if err != nil && err != io.EOF {
+					log.Printf(
+						"opening connection %d failed: TCP read error on %s -> %s when trying to scrape SNI header\n",
+						connectionId, clientConnection.RemoteAddr(), clientConnection.LocalAddr(),
+					)
+					clientConnection.Close()
+					continue
+				}
+
+				service := defaultService
+				hostname, err := getHostnameFromSNI(connectionHeader[:n])
+				if err != nil {
+					var has bool
+					service, has = serviceBySNI[hostname]
+					if !has {
+						service = defaultService
+					}
+				}
+
+				myConnectionId := fmt.Sprintf("%d_%d", service.ServiceID, connectionId)
+
+				go (func(myConnectionId string, connectionHeader []byte, service Service, clientConnection *net.TCPConn) {
 					defer clientConnection.Close()
 					if debugLog {
 						log.Printf(
-							"starting proxying connection %s: %s -> %s to %s\n",
-							myConnectionId, clientConnection.RemoteAddr(), clientConnection.LocalAddr(), *service.Dial,
+							"starting proxying connection %s: %s -> %s (%s) to %s\n",
+							myConnectionId, clientConnection.RemoteAddr(), clientConnection.LocalAddr(), hostname, *service.Dial,
 						)
 					}
-					proxyConnection, err := dialer.Dial("tcp", service.Dial.String())
+					proxyConnection, err := service.Dialer.Dial("tcp", service.Dial.String())
 					if err != nil {
 						log.Printf("ERROR: error occurred dailing %v: %s\n", *service.Dial, err)
 						return
 					} else if debugLog {
 						log.Printf(
-							"started proxying connection %s: %s -> %s to %s -> %v\n",
-							myConnectionId, clientConnection.RemoteAddr(), clientConnection.LocalAddr(), proxyConnection.LocalAddr(), *service.Dial,
+							"started proxying connection %s: %s -> %s (%s) to %s -> %v\n",
+							myConnectionId, clientConnection.RemoteAddr(), clientConnection.LocalAddr(), hostname, proxyConnection.LocalAddr(), *service.Dial,
 						)
 					}
 					defer proxyConnection.Close()
+
+					_, err = proxyConnection.Write(connectionHeader)
+					if err != nil {
+						log.Printf("write error when writing header for connection %s, %s\n", myConnectionId, err)
+						return
+					}
 
 					BlockingBidirectionalPipe(clientConnection, proxyConnection, "upstream", "downstream", myConnectionId, debugLog)
 
 					if debugLog {
 						log.Printf("done proxying connection %s\n", myConnectionId)
 					}
-				})(myConnectionId, clientConnection)
+				})(myConnectionId, connectionHeader, service, clientConnection)
 			}
-		})(serviceId, &service)
+		})(port, services)
 	}
 
 	// block forever
