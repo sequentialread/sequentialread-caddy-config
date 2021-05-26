@@ -79,6 +79,26 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock
       DOCKER_API_VERSION: '1.40'
 
+  owncast:
+    image: sequentialread/owncast:0.0.7-beta2
+    restart: always
+    command: ["/app/owncast", "-enableVerboseLogging"]
+    networks:
+      - blog
+    extra_hosts:
+      - "forest-laptop:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "directory.owncast.online:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+    volumes:
+      - type: bind
+        source: ./owncast/data
+        target: /app/data
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "stream.sequentialread.com,stream.beta.sequentialread.com"
+      sequentialread-8080-container-protocol: http
+
+
   goatcounter:
     image: sequentialread/goatcounter:1.4.2-9
     restart: always
@@ -246,8 +266,8 @@ services:
       DEBUG_LOG: 'true'
       SERVICE_0_LISTEN: ':465'
       SERVICE_0_DIAL: 'smtp.gmail.com:465'
-      SERVICE_1_LISTEN: ':8080'
-      SERVICE_1_DIAL: '192.168.0.46:8080'
+      #SERVICE_1_LISTEN: ':8080'
+      #SERVICE_1_DIAL: '192.168.0.46:8080'
 
   pwm:
     image: sequentialread/sequentialread-password-manager:2.0.6
@@ -270,7 +290,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.1.7
+    image: sequentialread/picopublish:0.1.9-test
     restart: always
     networks:
       - sequentialread
@@ -301,7 +321,7 @@ services:
   gitea:
     image: sequentialread/gitea-armv7:1.13.2 
     restart: always
-    mem_limit: 600m
+    mem_limit: 1000m
     ports:
       - "10022:10022"
     networks:
@@ -317,7 +337,7 @@ services:
       - SERVER_LANDING_PAGE='explore'
       - SSH_PORT=10022
       - SSH_LISTEN_PORT=10022
-      - ROOT_URL=https://git.beta.sequentialread.com
+      - ROOT_URL=https://git.sequentialread.com
       - DISABLE_REGISTRATION=true
       - INSTALL_LOCK=true
       - SECRET_KEY=${GITEA_SECRET_KEY}
@@ -348,23 +368,6 @@ services:
       - MYSQL_DATABASE=gitea
       - MYSQL_USER=gitea
       - MYSQL_PASSWORD=${GITEA_MARIADB_GITEA_PASSWORD} 
-
-  stream:
-    image: sequentialread/owncast-caching-proxy:0.0.18
-    networks:
-      - sequentialread
-    command: '${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}:8080'
-    volumes:
-      - type: bind
-        source: ./owncast-caching-proxy/cache
-        target: /app/cache
-    environment:
-      DEBUG: 0
-    labels:
-      sequentialread-8080-public-port: 443
-      sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "stream.sequentialread.com,stream.beta.sequentialread.com"
-      sequentialread-8080-container-protocol: http
 
   ghost:
     image: ghost:3.41-alpine
@@ -398,7 +401,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.45
+    image: sequentialread/comments:0.1.46
     restart: always
     extra_hosts:
       - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
@@ -415,7 +418,8 @@ services:
       - COMMENTS_HASH_SALT=klnv5ii043nbkjz__g34nnk_34wgn26lqlwqb7841mf
       - COMMENTS_CORS_ORIGINS=https://sequentialread.com,https://www.sequentialread.com,https://beta.sequentialread.com,https://www.beta.sequentialread.com
       - COMMENTS_CAPTCHA_API_TOKEN=${CAPTCHA_API_TOKEN}
-      - COMMENTS_CAPTCHA_URL=https://captcha.sequentialread.com
+      - COMMENTS_CAPTCHA_API_URL=http://captcha:2370
+      - COMMENTS_CAPTCHA_PUBLIC_URL=https://captcha.sequentialread.com
       - COMMENTS_CAPTCHA_DIFFICULTY_LEVEL=8
       - COMMENTS_EMAIL_HOST=smtp.gmail.com
       - COMMENTS_EMAIL_PORT=465
@@ -442,7 +446,11 @@ services:
       SERVICE_0_LISTEN: ':465'
       SERVICE_0_DIAL: 'smtp.gmail.com:465'
       SERVICE_1_LISTEN: ':443'
-      SERVICE_1_DIAL: '172.17.0.1:443'
+      SERVICE_1_DIAL: 'directory.owncast.online:443'
+      SERVICE_2_LISTEN: ':445'
+      SERVICE_2_DIAL: '192.168.0.46:445'
+      SERVICE_3_LISTEN: ':139'
+      SERVICE_3_DIAL: '192.168.0.46:139'
 
   captcha:
     image: sequentialread/pow-captcha:0.0.11
