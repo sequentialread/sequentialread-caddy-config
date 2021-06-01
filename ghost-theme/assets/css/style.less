@@ -83,6 +83,7 @@ body .navbar-toggle {
 	margin-top: 3
 }
 
+
 @media (min-width: 768px) {
 	body .navbar  {
 		.navbar-primary;
@@ -90,6 +91,82 @@ body .navbar-toggle {
 	body .header-bottom-line {
 		.navbar-secondary;
 	}
+}
+
+nav.navbar,
+nav .nav > li,
+nav .nav > li > a {
+  position: static;
+}
+
+.stream-live-indicator.mobile {
+  position: relative;
+  top: -0.2em;
+  right: 1em;
+}
+.stream-live-indicator {
+  background: red;
+  opacity: 1;
+  font-weight: bold;
+  color: white;
+  font-size: 0.8em;
+  padding: 0.2em;
+  border-radius: 0.3em;
+  padding-bottom: 0.05em;
+}
+.stream-live-indicator.desktop {
+  margin-left: 0.3em;
+}
+
+.popup-thumbnail-container {
+  position: absolute;
+}
+
+.popup-thumbnail {
+  display: none;
+}
+
+.navbar-toggle:hover .popup-thumbnail,
+.nav.navbar-nav a:hover .popup-thumbnail {
+  display: block;
+  position: relative;
+  background: #dbdbdb;
+  border: 3px solid #fc0000;
+  border-radius: 4px;
+  padding: 4px;
+  z-index: 10;
+}
+
+body nav .navbar-toggle .popup-thumbnail {
+  left: -146px;
+  top: 26px;
+}
+
+body nav .nav.navbar-nav a .popup-thumbnail {
+  left: -107px;
+  top: 28px;
+}
+
+.popup-thumbnail::before {
+  content: "▲";
+  color: red;
+  position: absolute;
+  font-size: 1.8rem;
+  z-index: 10;
+}
+
+body nav .nav.navbar-nav a .popup-thumbnail::before  {
+  top: -16px;
+  left: 73px;
+}
+
+body nav .navbar-toggle .popup-thumbnail::before {
+  top: -18px;
+  left: 86px;
+}
+
+.popup-thumbnail img {
+  width: 180px;
 }
 
 body .header-bottom-line {
@@ -348,6 +425,9 @@ article .content > p > img{
 .navbar-default .navbar-nav > .active > a:focus{ background-color: #B6372A; color: @default-foreground;}
 .navbar-default .navbar-use-use-cover{ color: red; }
 
+
+
+
 .thumbnail{ background-color: #F9F9F9; margin-bottom: 25px; border-bottom: 2px solid #D8D8D8; }
 .thumbnail > img, .thumbnail a > img{ width: 100%; }
 .thumbnail > .caption {
@@ -462,8 +542,6 @@ article .content > p > img{
 .hvr-fade {
   display: inline-block;
   vertical-align: middle;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
   box-shadow: 0 0 1px rgba(0, 0, 0, 0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
