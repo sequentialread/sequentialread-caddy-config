@@ -80,9 +80,9 @@ services:
       DOCKER_API_VERSION: '1.40'
 
   owncast:
-    image: sequentialread/owncast:0.0.7-beta2
+    image: sequentialread/owncast:0.0.7-beta8
     restart: always
-    command: ["/app/owncast", "-enableVerboseLogging"]
+    command: ["/app/owncast"]
     networks:
       - blog
     extra_hosts:
@@ -341,33 +341,33 @@ services:
       - DISABLE_REGISTRATION=true
       - INSTALL_LOCK=true
       - SECRET_KEY=${GITEA_SECRET_KEY}
-      - DB_TYPE=mysql
-      - DB_HOST=gitea-mariadb
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
       - DB_NAME=gitea
       - DB_USER=gitea
-      - DB_PASSWD=${GITEA_MARIADB_GITEA_PASSWORD}
+      - DB_PASSWD=${POSTGRES_GITEA_PASSWORD}
     depends_on:
-      - gitea-mariadb
+      - postgres
     labels:
       sequentialread-3000-public-port: 443
       sequentialread-3000-public-protocol: https
       sequentialread-3000-public-hostnames: "www.git.sequentialread.com,git.sequentialread.com,git.beta.sequentialread.com"
       sequentialread-3000-container-protocol: http
 
-  gitea-mariadb:
-    image: sequentialread/mariadb-armv7:10.3
+  postgres:
+    image: postgres:13.3-alpine
     restart: always
     networks:
       - gitea
     volumes:
       - type: bind
-        source: ./gitea-mariadb/
-        target: /var/lib/mysql
+        source: ./postgres/data
+        target: /var/lib/postgres
+      - type: bind
+        source: ./postgres/init/
+        target: /docker-entrypoint-initdb.d
     environment:
-      - MYSQL_ROOT_PASSWORD=${GITEA_MARIADB_ROOT_PASSWORD}
-      - MYSQL_DATABASE=gitea
-      - MYSQL_USER=gitea
-      - MYSQL_PASSWORD=${GITEA_MARIADB_GITEA_PASSWORD} 
+      - POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD}
 
   ghost:
     image: ghost:3.41-alpine
