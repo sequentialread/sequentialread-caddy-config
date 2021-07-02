@@ -24,9 +24,11 @@ type Config struct {
 	GlobalContentTypeBlacklistRegex string
 	BlacklistIPsCSV                 string
 	BlacklistURIRegexesCSV          string
+	BlacklistHeaderKeysCSV          string
 	AlwaysIncludeURIsCSV            string
 	BlacklistIPs                    []string         `json:"-"`
 	BlacklistURIRegexes             []*regexp.Regexp `json:"-"`
+	BlacklistHeaderKeys             []string         `json:"-"`
 	AlwaysIncludeURIs               []string         `json:"-"`
 	GlobalContentTypeBlacklist      *regexp.Regexp   `json:"-"`
 	Domains                         []*Domain
@@ -61,8 +63,11 @@ type CaddyLogRequest struct {
 	Headers    map[string][]string `json:"headers"`
 }
 
+var seenRangeRequests map[string]bool
+
 func main() {
 
+	seenRangeRequests := map[string]bool{}
 	config := loadConfigFromFileAndEnvVars()
 
 	bytez, err := json.MarshalIndent(config, "", "  ")
@@ -217,6 +222,17 @@ func main() {
 			key = fmt.Sprintf("/%s%s", host, key)
 		}
 
+		// don't treat each individual http range request as a separate hit. group them by goatcounter key and remote address
+		// aka connection Id
+		if caddyLog.Request.Headers["Range"] != nil && len(caddyLog.Request.Headers["Range"]) > 0 {
+			rangeRequestKey := fmt.Sprintf("%s_%s", caddyLog.Request.RemoteAddr, key)
+			if !seenRangeRequests[rangeRequestKey] {
+				seenRangeRequests[rangeRequestKey] = true
+			} else {
+				continue
+			}
+		}
+
 		search := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, caddyLog.Request.URI, caddyLog.Request.Proto)
 		replace := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, key, caddyLog.Request.Proto)
 
@@ -292,6 +308,7 @@ func loadConfigFromFileAndEnvVars() *Config {
 		config.BlacklistURIRegexes = append(config.BlacklistURIRegexes, regexp.MustCompile(regexString))
 	}
 	config.AlwaysIncludeURIs = parseConfigCSV(config.AlwaysIncludeURIsCSV)
+	config.BlacklistHeaderKeys = parseConfigCSV(config.BlacklistHeaderKeysCSV)
 	config.BlacklistIPs = parseConfigCSV(config.BlacklistIPsCSV)
 
 	return config
