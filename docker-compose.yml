@@ -118,7 +118,7 @@ services:
       sequentialread-8080-container-protocol: http
 
   goatcounter-log-publisher:
-    image: sequentialread/goatcounter:1.4.2-34
+    image: sequentialread/goatcounter:1.4.2-36
     restart: always
     entrypoint: ["/bin/sh"]
     command: ["-c", "tail -F /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com:8080 -format combined-vhost -- -"]
@@ -139,7 +139,7 @@ services:
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
       - LOGADAPTER_DEBUG=false
       - LOGADAPTER_ALWAYSINCLUDEURISCSV=,
-      - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,71.34.21.181
+      - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,97.116.8.244
       - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
@@ -290,7 +290,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.1.9-test
+    image: sequentialread/picopublish:0.1.11
     restart: always
     networks:
       - sequentialread
