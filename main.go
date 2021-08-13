@@ -55,6 +55,7 @@ type ContainerConfig struct {
 	PublicPort           int
 	PublicProtocol       string
 	PublicHostnames      string
+	PublicPaths          string
 	ContainerProtocol    string
 	ContainerAddress     string
 	ContainerName        string
@@ -129,6 +130,9 @@ type CaddyMatch struct {
 	// match host
 	Host []string `json:"host,omitempty"`
 
+	// match path
+	Path []string `json:"path,omitempty"`
+
 	// match vars regexp
 	VarsRegexp map[string]CaddyVarsRegexp `json:"vars_regexp,omitempty"`
 }
@@ -202,8 +206,9 @@ func IngressConfig() error {
 	// sequentialread-80-public-port: 443
 	// sequentialread-80-public-protocol: https
 	// sequentialread-80-public-hostnames: "example.com,www.example.com"
+	// sequentialread-80-public-paths: "/example,/example2"
 	// sequentialread-80-container-protocol: http
-	ingressLabelRegexp := regexp.MustCompile("sequentialread-([0-9]+)-((public-port)|(public-protocol)|(public-hostnames)|(container-protocol))")
+	ingressLabelRegexp := regexp.MustCompile("sequentialread-([0-9]+)-((public-port)|(public-protocol)|(public-hostnames)|(public-paths)|(container-protocol))")
 
 	containerConfigs := map[string]*ContainerConfig{}
 
@@ -256,6 +261,9 @@ func IngressConfig() error {
 				}
 				if labelType == "public-hostnames" {
 					containerConfigs[container.Id].PublicHostnames = value
+				}
+				if labelType == "public-paths" {
+					containerConfigs[container.Id].PublicPaths = value
 				}
 				if labelType == "container-protocol" {
 					containerConfigs[container.Id].ContainerProtocol = value
@@ -350,35 +358,59 @@ func IngressConfig() error {
 			}
 
 			// sort them so that the json always comes out the same & easier to compare (canonical)
+			// also include the ones that specify a path first so they take precidence when two handlers match the same domain
+			getShortestPathLength := func(paths []string) int {
+				shortest := 255
+				for _, path := range paths {
+					result := len(strings.Split(path, "/"))
+					if result < shortest {
+						shortest = result
+					}
+				}
+				return shortest
+			}
 			sort.Slice(containerConfigs, func(i, j int) bool {
-				return containerConfigs[i].ContainerName < containerConfigs[j].ContainerName
+				sortI := fmt.Sprintf(
+					"%s%s",
+					string(rune(255-getShortestPathLength(strings.Split(containerConfigs[i].PublicPaths, ",")))),
+					containerConfigs[i].ContainerName,
+				)
+				sortJ := fmt.Sprintf(
+					"%s%s",
+					string(rune(255-getShortestPathLength(strings.Split(containerConfigs[j].PublicPaths, ",")))),
+					containerConfigs[j].ContainerName,
+				)
+				return sortI < sortJ
 			})
 
 			for _, container := range containerConfigs {
 				if container.PublicHostnames != "" {
+					match := CaddyMatch{
+						Host: strings.Split(container.PublicHostnames, ","),
+					}
+					if container.PublicPaths != "" {
+						match.Path = strings.Split(container.PublicPaths, ",")
+					}
+
 					newRoute := CaddyRoute{
 						Handle: []CaddyHandler{
 							// this handler is just here to standardize the favicon (or any other universal static file)
 							// across the sites
-							CaddyHandler{
+							{
 								Handler:     "file_server",
 								Root:        FAVICON_DIRECTORY,
 								Passthrough: true,
 							},
-							CaddyHandler{
+							{
 								Handler: "reverse_proxy",
 								Upstreams: []CaddyUpstream{
-									CaddyUpstream{
+									{
 										Dial: container.ContainerAddress,
 									},
 								},
 							},
 						},
-						Match: []CaddyMatch{
-							CaddyMatch{
-								Host: strings.Split(container.PublicHostnames, ","),
-							},
-						},
+						Match:    []CaddyMatch{match},
 						Terminal: true,
 					}
 
