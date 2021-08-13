@@ -31,7 +31,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.13
+    image: sequentialread/caddy-config:0.0.14
     #mem_limit: 50m
     networks:
       - sequentialread
@@ -161,7 +161,6 @@ services:
       - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_2_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_2_CONTENTTYPEWHITELISTREGEX=DROP_ALL
-
 
   influxdb:
     image: influxdb:1.8.4
@@ -371,6 +370,29 @@ services:
       sequentialread-3000-public-protocol: https
       sequentialread-3000-public-hostnames: "www.git.sequentialread.com,git.sequentialread.com,git.beta.sequentialread.com"
       sequentialread-3000-container-protocol: http
+
+
+  gitea-registration-proxy:
+    image: sequentialread/gitea-registration-proxy:0.0.0
+    restart: always
+    networks:
+      - gitea
+      - blog
+    environment:
+      - DEBUG=gitea-registration-proxy
+      - REGPROXY_GITEA=gitea:3000
+      - REGPROXY_HOST=0.0.0.0
+      - REGPROXY_POWCAPTCHAAPIURL=http://captcha:2370
+      - REGPROXY_POWCAPTCHAAPITOKEN=${REGPROXY_POWCAPTCHAAPITOKEN}
+    depends_on:
+      - gitea
+      - captcha
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "www.git.sequentialread.com,git.sequentialread.com,git.beta.sequentialread.com"
+      sequentialread-8080-public-paths: "/user/sign_up"
+      sequentialread-8080-container-protocol: http
 
   postgres:
     image: postgres:13.3-alpine

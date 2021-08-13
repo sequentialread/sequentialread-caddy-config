@@ -295,8 +295,16 @@ func IngressConfig() error {
 		if port == 443 {
 
 			allHostnames := []string{}
+			hostnamesMap := map[string]bool{}
 			for _, container := range containerConfigs {
-				allHostnames = append(allHostnames, strings.Split(container.PublicHostnames, ",")...)
+				containerHostnames := strings.Split(container.PublicHostnames, ",")
+				for _, hostname := range containerHostnames {
+					if !hostnamesMap[hostname] {
+						allHostnames = append(allHostnames, hostname)
+					}
+					hostnamesMap[hostname] = true
+				}
+
 			}
 			sort.Strings(allHostnames)
 
