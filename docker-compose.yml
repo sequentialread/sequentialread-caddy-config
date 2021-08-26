@@ -310,7 +310,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.2.1-test9
+    image: sequentialread/picopublish:0.2.3
     restart: always
     networks:
       - blog
