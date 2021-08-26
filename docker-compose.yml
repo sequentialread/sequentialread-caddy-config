@@ -1,6 +1,7 @@
 version: "3.3"
 services:
   caddy:
+    restart: always
     image: caddy:2.3.0
     networks:
       - blog
@@ -32,6 +33,7 @@ services:
 
   caddy-config:
     image: sequentialread/caddy-config:0.0.15
+    restart: always
     #mem_limit: 50m
     networks:
       - sequentialread
@@ -50,6 +52,7 @@ services:
 
   docker-api-security-gateway:
     image: sequentialread/docker-api-security-gateway:0.0.16
+    restart: always
     #mem_limit: 50m
     userns_mode: "host"
     volumes:
@@ -307,12 +310,15 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.1.11
+    image: sequentialread/picopublish:0.2.1-test9
     restart: always
     networks:
-      - sequentialread
+      - blog
     environment:
-      - PICO_PUBLISH_PASSWORD=${PICOPUBLISH_PASSWORD}
+      - PICOPUBLISH_PASSWORD=${PICOPUBLISH_PASSWORD}
+      - PICOPUBLISH_CAPTCHA_API_TOKEN=${PICOPUBLISH_CAPTCHA_API_TOKEN}
+      - PICOPUBLISH_CAPTCHA_API_URL=http://captcha:2370
+      - PICOPUBLISH_CAPTCHA_PUBLIC_URL=https://captcha.sequentialread.com
     volumes:
       - type: bind
         source: ./picopublish/data
@@ -506,7 +512,7 @@ services:
       SERVICE_3_DIAL: '192.168.0.46:139'
 
   captcha:
-    image: sequentialread/pow-captcha:0.0.11
+    image: sequentialread/pow-captcha:0.0.12
     restart: always
     networks:
       - blog
@@ -555,4 +561,3 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
