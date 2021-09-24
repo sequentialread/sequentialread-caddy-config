@@ -245,7 +245,7 @@ services:
     entrypoint: /bin/sh
     command: ["-c", "echo 'hosts: files dns' > /etc/nsswitch.conf && su -s '/bin/sh' -c '/run.sh' grafana"]
     extra_hosts:
-      - "smtp.gmail.com:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "smtp.nullhex.com:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - sequentialread
     volumes:
@@ -264,10 +264,10 @@ services:
       GF_AUTH_ANONYMOUS_ORG_NAME: sequentialread
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SMTP_ENABLED: 'true'
-      GF_SMTP_HOST: 'smtp.gmail.com:465'
-      GF_SMTP_PASSWORD: ${GMAIL_PASSWORD}
-      GF_SMTP_USER: gitlab.sequentialread.com@gmail.com
-      GF_SMTP_FROM_ADDRESS: gitlab.sequentialread.com@gmail.com
+      GF_SMTP_HOST: 'smtp.nullhex.com:465'
+      GF_SMTP_PASSWORD: ${NULLHEX_PASSWORD}
+      GF_SMTP_USER: forest@sequentialread.com
+      GF_SMTP_FROM_ADDRESS: forest@sequentialread.com
       GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
     labels:
       sequentialread-3000-public-port: 443
@@ -285,7 +285,7 @@ services:
     environment:
       DEBUG_LOG: 'true'
       SERVICE_0_LISTEN: ':465'
-      SERVICE_0_DIAL: 'smtp.gmail.com:465'
+      SERVICE_0_DIAL: 'smtp.nullhex.com:465'
       #SERVICE_1_LISTEN: ':8080'
       #SERVICE_1_DIAL: '192.168.0.46:8080'
 
@@ -310,7 +310,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.2.3
+    image: sequentialread/picopublish:0.2.3-test3
     restart: always
     networks:
       - blog
@@ -432,7 +432,7 @@ services:
     image: ghost:3.41-alpine
     restart: always
     extra_hosts:
-      - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - blog
     volumes:
@@ -446,24 +446,60 @@ services:
       - database__connection__filename=content/data/ghost-prod.db 
       - database__useNullAsDefault=true
       - database__debug=false
-      - mail__from=gitlab.sequentialread.com@gmail.com
+      - mail__from=forest@sequentialread.com
       - mail__transport=SMTP
-      - mail__options__host=smtp.gmail.com
+      - mail__options__host=smtp.nullhex.com
       - mail__options__port=465
-      - mail__options__auth__user=gitlab.sequentialread.com@gmail.com
-      - mail__options__auth__pass=${GMAIL_PASSWORD}
+      - mail__options__auth__user=forest@sequentialread.com
+      - mail__options__auth__pass=${NULLHEX_PASSWORD}
     labels:
       sequentialread-2368-public-port: 443
       sequentialread-2368-public-protocol: https
       sequentialread-2368-public-hostnames: "sequentialread.com,www.sequentialread.com,beta.sequentialread.com,www.beta.sequentialread.com"
       sequentialread-2368-container-protocol: http
 
+  webmentiond:
+    image: sequentialread/webmentiond:a19bf08-test
+    restart: always
+    extra_hosts:
+      - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+    networks:
+      - blog
+    volumes:
+      - type: bind
+        source: ./webmentiond/data
+        target: /data
+    command:
+      - "--addr"
+      - "0.0.0.0:8080"
+      - "--auth-admin-emails"
+      - "forest.n.johnson@gmail.com"
+      - "--allowed-target-domains"
+      - "https://sequentialread.com"
+      - "--public-url"
+      - "https://webmentiond.sequentialread.com"
+      - "--send-notifications"
+      - "true"
+    environment:
+      MAIL_HOST: 'smtp.nullhex.com'
+      MAIL_PORT: '465'
+      MAIL_USER: 'forest@sequentialread.com'
+      MAIL_FROM: 'forest@sequentialread.com'
+      MAIL_PASSWORD: '${NULLHEX_PASSWORD}'
+      MAIL_NO_TLS: 'false'
+      AUTH_JWT_SECRET: '${WEBMENTIOND_JWT_SECRET}'
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "webmentiond.sequentialread.com"
+      sequentialread-8080-container-protocol: http
+
 
   comments:
     image: sequentialread/comments:0.1.46
     restart: always
     extra_hosts:
-      - "smtp.gmail.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
       - "captcha.sequentialread.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - blog
@@ -480,11 +516,11 @@ services:
       - COMMENTS_CAPTCHA_API_URL=http://captcha:2370
       - COMMENTS_CAPTCHA_PUBLIC_URL=https://captcha.sequentialread.com
       - COMMENTS_CAPTCHA_DIFFICULTY_LEVEL=8
-      - COMMENTS_EMAIL_HOST=smtp.gmail.com
+      - COMMENTS_EMAIL_HOST=smtp.nullhex.com
       - COMMENTS_EMAIL_PORT=465
-      - COMMENTS_EMAIL_USER=gitlab.sequentialread.com@gmail.com
-      - COMMENTS_EMAIL_PASSWORD=${GMAIL_PASSWORD}
-      - COMMENTS_NOTIFICATION_TARGET=forest.n.johnson@gmail.com
+      - COMMENTS_EMAIL_USER=forest@sequentialread.com
+      - COMMENTS_EMAIL_PASSWORD=${NULLHEX_PASSWORD}
+      - COMMENTS_NOTIFICATION_TARGET=forest@sequentialread.com
       - COMMENTS_ADMIN_PASSWORD=${COMMENTS_ADMIN_PASSWORD}
     labels:
       sequentialread-8080-public-port: 443
@@ -503,7 +539,7 @@ services:
     environment:
       DEBUG_LOG: 'true'
       SERVICE_0_LISTEN: ':465'
-      SERVICE_0_DIAL: 'smtp.gmail.com:465'
+      SERVICE_0_DIAL: 'smtp.nullhex.com:465'
       SERVICE_1_LISTEN: ':443'
       SERVICE_1_DIAL: 'directory.owncast.online:443'
       SERVICE_2_LISTEN: ':445'
@@ -512,7 +548,7 @@ services:
       SERVICE_3_DIAL: '192.168.0.46:139'
 
   captcha:
-    image: sequentialread/pow-captcha:0.0.12
+    image: sequentialread/pow-captcha:0.0.13
     restart: always
     networks:
       - blog
@@ -561,3 +597,4 @@ networks:
 
 volumes:
   caddy-socket-volume:
+
