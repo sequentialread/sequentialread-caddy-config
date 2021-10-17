@@ -344,7 +344,7 @@ services:
   gitea:
     image: sequentialread/gitea-armv7:1.13.2 
     restart: always
-    mem_limit: 1000m
+    mem_limit: 1400m
     ports:
       - "10022:10022"
     extra_hosts:
@@ -459,12 +459,10 @@ services:
       sequentialread-2368-container-protocol: http
 
   webmentiond:
-    image: sequentialread/webmentiond:a19bf08-test
+    image: sequentialread/webmentiond:d9db3a5
     restart: always
-    extra_hosts:
-      - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
-      - blog
+      - internet-access
     volumes:
       - type: bind
         source: ./webmentiond/data
@@ -475,7 +473,7 @@ services:
       - "--auth-admin-emails"
       - "forest.n.johnson@gmail.com"
       - "--allowed-target-domains"
-      - "https://sequentialread.com"
+      - "sequentialread.com"
       - "--public-url"
       - "https://webmentiond.sequentialread.com"
       - "--send-notifications"
@@ -597,4 +595,5 @@ networks:
 
 volumes:
   caddy-socket-volume:
+
 
