@@ -165,6 +165,21 @@ services:
       - LOGADAPTER_DOMAINS_2_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_2_CONTENTTYPEWHITELISTREGEX=DROP_ALL
 
+  greenhouse-telemetry:
+    image: sequentialread/greenhouse-telemetry:0.1.1
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./greenhouse-telemetry/data
+        target: /greenhouse-telemetry/data
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "greenhouse-telemetry.sequentialread.com,telemetry.greenhouse-alpha.server.garden"
+      sequentialread-8080-container-protocol: http
+
   loki:
     image: grafana/loki:main-c4562f1
     restart: always
@@ -177,11 +192,7 @@ services:
       - type: bind
         source: ./loki/config.yml
         target: /etc/loki/local-config.yaml
-    labels:
-      sequentialread-3100-public-port: 443
-      sequentialread-3100-public-protocol: https
-      sequentialread-3100-public-hostnames: "loki.sequentialread.com,telemetry.greenhouse-alpha.server.garden"
-      sequentialread-3100-container-protocol: http
+
 
   influxdb:
     image: influxdb:1.8.4
