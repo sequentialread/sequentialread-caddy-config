@@ -81,6 +81,70 @@ services:
       DOCKER_API_PROXY_HTTP_LISTENUNIXSOCKETGID: 165536
       DOCKER_HOST: unix:///var/run/docker.sock
       DOCKER_API_VERSION: '1.40'
+  
+  greenhouse:
+    image: sequentialread/greenhouse:0.0.24
+    restart: always
+    volumes:
+      - type: bind
+        source: ./greenhouse/greenhouse-daemon
+        target: /greenhouse/greenhouse-daemon
+      - type: bind
+        source: ./picopublish/data
+        target: /greenhouse/releases
+      - type: bind
+        source: ./greenhouse/config
+        target: /greenhouse/config
+    networks:
+      - internet-access
+      - gitea
+      - sequentialread
+    environment:
+      - GREENHOUSE_LOKI_URL=http://loki:3100
+      - GREENHOUSE_HOMEPAGE_MARKDOWN_URL=http://gitea:3000/forest/greenhouse/raw/branch/master/readme/ALPHA.md
+      - GREENHOUSE_ENABLE_REGISTRATION=false
+      - GREENHOUSE_DIGITALOCEAN_API_KEY=${GREENHOUSE_DIGITALOCEAN_API_KEY}
+      - GREENHOUSE_DATABASE_CONNECTION_STRING=${GREENHOUSE_DATABASE_CONNECTION_STRING}
+      - GREENHOUSE_DATABASE_SCHEMA=public
+      - GREENHOUSE_GANDI_API_KEY=${GREENHOUSE_GANDI_API_KEY}
+      - GREENHOUSE_SSH_PRIVATE_KEY_FILE=/greenhouse/config/greenhouse_ed25519
+      - GREENHOUSE_BACKBLAZE_BUCKET_NAME=greenhouse-cloud-provider
+      - GREENHOUSE_BACKBLAZE_KEY_ID=0003ea77f5997840000000012
+      - GREENHOUSE_BACKBLAZE_SECRET_KEY=${GREENHOUSE_BACKBLAZE_SECRET_KEY}
+      - GREENHOUSE_SMTP_HOST=smtp.nullhex.com
+      - GREENHOUSE_SMTP_PORT=465
+      - GREENHOUSE_SMTP_USERNAME=noreply@server.garden
+      - GREENHOUSE_SMTP_PASSWORD=${GREENHOUSE_SMTP_PASSWORD}
+      - GREENHOUSE_SMTP_ENCRYPTION=SMTPS
+
+  greenhouse-telemetry:
+    image: sequentialread/greenhouse-telemetry:0.1.6
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./greenhouse-telemetry/data
+        target: /greenhouse-telemetry/data
+    labels:
+      sequentialread-8080-public-port: 443
+      sequentialread-8080-public-protocol: https
+      sequentialread-8080-public-hostnames: "greenhouse-telemetry.sequentialread.com,telemetry.greenhouse-alpha.server.garden"
+      sequentialread-8080-container-protocol: http
+
+
+  loki:
+    image: grafana/loki:main-c4562f1
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./loki/data
+        target: /loki
+      - type: bind
+        source: ./loki/config.yml
+        target: /etc/loki/local-config.yaml
 
   servergardenwebsite:
     image: nginx
@@ -96,7 +160,7 @@ services:
       sequentialread-80-public-protocol: https
       sequentialread-80-public-hostnames: "server.garden,www.server.garden,greenhouse.server.garden,www.greenhouse.server.garden"
       sequentialread-80-container-protocol: http
-
+  
   owncast:
     image: sequentialread/owncast:0.0.7-beta8
     restart: always
@@ -115,8 +179,7 @@ services:
       sequentialread-8080-public-protocol: https
       sequentialread-8080-public-hostnames: "stream.sequentialread.com,stream.beta.sequentialread.com"
       sequentialread-8080-container-protocol: http
-
-
+  
   goatcounter:
     image: sequentialread/goatcounter:1.4.2-9
     restart: always
@@ -160,39 +223,10 @@ services:
       - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,97.116.8.244
       - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
-      - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=^(www\.)?(greenhouse\.)?server.garden
+      - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=^(www\.)?(greenhouse(-alpha)?\.)?server.garden
       - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_2_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_2_CONTENTTYPEWHITELISTREGEX=DROP_ALL
-
-  greenhouse-telemetry:
-    image: sequentialread/greenhouse-telemetry:0.1.1
-    restart: always
-    networks:
-      - sequentialread
-    volumes:
-      - type: bind
-        source: ./greenhouse-telemetry/data
-        target: /greenhouse-telemetry/data
-    labels:
-      sequentialread-8080-public-port: 443
-      sequentialread-8080-public-protocol: https
-      sequentialread-8080-public-hostnames: "greenhouse-telemetry.sequentialread.com,telemetry.greenhouse-alpha.server.garden"
-      sequentialread-8080-container-protocol: http
-
-  loki:
-    image: grafana/loki:main-c4562f1
-    restart: always
-    networks:
-      - sequentialread
-    volumes:
-      - type: bind
-        source: ./loki/data
-        target: /loki
-      - type: bind
-        source: ./loki/config.yml
-        target: /etc/loki/local-config.yaml
-
 
   influxdb:
     image: influxdb:1.8.4
@@ -523,7 +557,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.46
+    image: sequentialread/comments:0.1.47
     restart: always
     extra_hosts:
       - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
@@ -538,7 +572,7 @@ services:
       - COMMENTS_LISTEN_PORT=8080
       - COMMENTS_BASE_URL=https://comments.sequentialread.com
       - COMMENTS_HASH_SALT=klnv5ii043nbkjz__g34nnk_34wgn26lqlwqb7841mf
-      - COMMENTS_CORS_ORIGINS=https://sequentialread.com,https://www.sequentialread.com,https://beta.sequentialread.com,https://www.beta.sequentialread.com
+      - COMMENTS_CORS_ORIGINS=https://sequentialread.com,https://www.sequentialread.com,https://greenhouse-alpha.server.garden,https://greenhouse.server.garden
       - COMMENTS_CAPTCHA_API_TOKEN=${CAPTCHA_API_TOKEN}
       - COMMENTS_CAPTCHA_API_URL=http://captcha:2370
       - COMMENTS_CAPTCHA_PUBLIC_URL=https://captcha.sequentialread.com
@@ -624,5 +658,6 @@ networks:
 
 volumes:
   caddy-socket-volume:
+
 
 
