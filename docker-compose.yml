@@ -83,7 +83,7 @@ services:
       DOCKER_API_VERSION: '1.40'
   
   greenhouse:
-    image: sequentialread/greenhouse:0.0.24
+    image: sequentialread/greenhouse:0.0.42
     restart: always
     volumes:
       - type: bind
@@ -102,7 +102,7 @@ services:
     environment:
       - GREENHOUSE_LOKI_URL=http://loki:3100
       - GREENHOUSE_HOMEPAGE_MARKDOWN_URL=http://gitea:3000/forest/greenhouse/raw/branch/master/readme/ALPHA.md
-      - GREENHOUSE_ENABLE_REGISTRATION=false
+      - GREENHOUSE_ENABLE_REGISTRATION=true
       - GREENHOUSE_DIGITALOCEAN_API_KEY=${GREENHOUSE_DIGITALOCEAN_API_KEY}
       - GREENHOUSE_DATABASE_CONNECTION_STRING=${GREENHOUSE_DATABASE_CONNECTION_STRING}
       - GREENHOUSE_DATABASE_SCHEMA=public
@@ -118,7 +118,7 @@ services:
       - GREENHOUSE_SMTP_ENCRYPTION=SMTPS
 
   greenhouse-telemetry:
-    image: sequentialread/greenhouse-telemetry:0.1.6
+    image: sequentialread/greenhouse-telemetry:0.1.13
     restart: always
     networks:
       - sequentialread
@@ -220,7 +220,7 @@ services:
       - LOGADAPTER_INCLUDESUCCESSORFAILUREINKEY=false
       - LOGADAPTER_DEBUG=false
       - LOGADAPTER_ALWAYSINCLUDEURISCSV=,
-      - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,97.116.8.244
+      - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,97.116.20.61,185.12.148.78
       - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=^(www\.)?(greenhouse(-alpha)?\.)?server.garden
@@ -658,6 +658,5 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
 
 
