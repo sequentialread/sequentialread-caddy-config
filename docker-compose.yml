@@ -83,8 +83,10 @@ services:
       DOCKER_API_VERSION: '1.40'
   
   greenhouse:
-    image: sequentialread/greenhouse:0.0.42
+    image: sequentialread/greenhouse:0.0.43
     restart: always
+    ports: 
+      - 18080:8080
     volumes:
       - type: bind
         source: ./greenhouse/greenhouse-daemon
@@ -101,7 +103,7 @@ services:
       - sequentialread
     environment:
       - GREENHOUSE_LOKI_URL=http://loki:3100
-      - GREENHOUSE_HOMEPAGE_MARKDOWN_URL=http://gitea:3000/forest/greenhouse/raw/branch/master/readme/ALPHA.md
+      - GREENHOUSE_HOMEPAGE_MARKDOWN_URL=http://gitea:3000/forest/greenhouse/raw/branch/main/readme/ALPHA.md
       - GREENHOUSE_ENABLE_REGISTRATION=true
       - GREENHOUSE_DIGITALOCEAN_API_KEY=${GREENHOUSE_DIGITALOCEAN_API_KEY}
       - GREENHOUSE_DATABASE_CONNECTION_STRING=${GREENHOUSE_DATABASE_CONNECTION_STRING}
@@ -162,7 +164,7 @@ services:
       sequentialread-80-container-protocol: http
   
   gotosocial:
-    image: sequentialread/gotosocial:0.1.0-test3
+    image: sequentialread/gotosocial:0.1.0-test12
     restart: always
     networks:
       - internet-access
@@ -171,23 +173,26 @@ services:
         source: ./gotosocial/storage
         target: /gotosocial/storage
     environment:
+      GTS_LOG_LEVEL: 'trace'
       GTS_PORT: '8080'
       GTS_PROTOCOL: 'https'
       GTS_TRUSTED_PROXIES: '0.0.0.0/0'
       GTS_HOST: 'gotosocial.sequentialread.com'
-      GTS_ACCOUNT_DOMAIN: 'sequentialread.com'
+      GTS_ACCOUNT_DOMAIN: 'gotosocial.sequentialread.com'
       GTS_DB_TYPE: 'sqlite'
       GTS_DB_ADDRESS: '/gotosocial/storage/database/sqlite.db'
       GTS_STORAGE_SERVE_PROTOCOL: 'https'
       GTS_STORAGE_SERVE_HOST: 'gotosocial.sequentialread.com'
       GTS_STORAGE_SERVE_BASE_PATH: '/media'
       GTS_ACCOUNTS_OPEN_REGISTRATION: 'true'
-      GTS_LETS_ENCRYPT_ENABLED: 'false'
-      GTS_SMTP_HOST: 'smtp.nullhex.co'
-      GTS_SMTP_PORT: '465'
-      GTS_SMTP_USERNAME: 'forest@sequentialread.com'
-      GTS_SMTP_PASSWORD: '${NULLHEX_PASSWORD}'
-      GTS_SMTP_FROM: 'forest@sequentialread.com'
+      GTS_ACCOUNTS_APPROVAL_REQUIRED: 'false'
+      GTS_ACCOUNTS_REASON_REQUIRED: 'false'
+      GTS_LETSENCRYPT_ENABLED: 'false'
+      SSMTP_HOST: 'smtp.nullhex.com'
+      SSMTP_PORT: '587'
+      SSMTP_USERNAME: 'forest@sequentialread.com'
+      SSMTP_PASSWORD: '${NULLHEX_PASSWORD}'
+      SSMTP_FROM: 'forest@sequentialread.com'
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
@@ -198,7 +203,7 @@ services:
 
 
   owncast:
-    image: sequentialread/owncast:0.0.7-beta8
+    image: sequentialread/owncast:0.0.7-beta9
     restart: always
     command: ["/app/owncast"]
     networks:
@@ -333,6 +338,7 @@ services:
 
   grafana:
     image: grafana/grafana:7.4.3
+    restart: always
     # The Grafana docker container is missing the /etc/nsswitch.conf file which
     # many things rely on in order to know how to properly look up domain names.
     # See: https://github.com/gliderlabs/docker-alpine/issues/367
@@ -470,6 +476,7 @@ services:
       - DB_NAME=gitea
       - DB_USER=gitea
       - DB_PASSWD=${POSTGRES_GITEA_PASSWORD}
+      - GITEA_CUSTOM=/data/gitea
     depends_on:
       - postgres
     labels:
@@ -694,4 +701,5 @@ networks:
 
 volumes:
   caddy-socket-volume:
+
 
