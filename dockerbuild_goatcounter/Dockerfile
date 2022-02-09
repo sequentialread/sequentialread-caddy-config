@@ -1,4 +1,4 @@
-FROM golang:1.16-buster as build
+FROM golang:1.17-buster as build
 ARG GOARCH=
 ENV CGO_ENABLED 1
 ENV CC "$CC"
@@ -6,8 +6,11 @@ ENV CC "$CC"
 RUN mkdir /build
 WORKDIR /build
 RUN apt update && apt install -y git build-essential
-RUN git clone -v https://github.com/zgoat/goatcounter
-RUN cd goatcounter && git checkout be3116c320b40f1161584e78329d0ca6cb5f2dcf
+RUN git clone -v  https://github.com/zgoat/goatcounter
+
+# v2.1.1
+RUN cd goatcounter && git tag && git checkout 2461147f90cc340997710c307afe078548ffe7d6 
+
 RUN cd goatcounter && echo "CC=$CC" && go get 
 RUN cd goatcounter/cmd/goatcounter && go build -tags 'sqlite_omit_load_extension osusergo netgo'  -ldflags='-extldflags=-static'  -o ../../../goatcounter_binary -v .
 COPY goatcounter-caddy-log-adapter /build/goatcounter-caddy-log-adapter

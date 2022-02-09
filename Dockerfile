@@ -7,8 +7,8 @@ WORKDIR /build
 RUN apk add --update --no-cache ca-certificates git 
 COPY go.mod go.mod
 COPY go.sum go.sum
+RUN go mod download
 COPY main.go main.go
-RUN go get 
 RUN  go build -v $GO_BUILD_ARGS -o /build/sequentialread-caddy-config .
 
 

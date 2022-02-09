@@ -32,7 +32,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.15
+    image: sequentialread/caddy-config:0.0.16-ece49ee-777d
     restart: always
     #mem_limit: 50m
     networks:
@@ -162,9 +162,21 @@ services:
       sequentialread-80-public-protocol: https
       sequentialread-80-public-hostnames: "server.garden,www.server.garden,greenhouse.server.garden,www.greenhouse.server.garden"
       sequentialread-80-container-protocol: http
+
+  pinafore:
+    image: sequentialread/pinafore:v2.0.4-0616a2ba-2ecc
+    restart: always
+    networks:
+      - internet-access
+    labels:
+      sequentialread-4002-public-port: 443
+      sequentialread-4002-public-protocol: https
+      sequentialread-4002-public-hostnames: "social.sequentialread.com"
+      sequentialread-4002-container-protocol: http
+
   
   gotosocial:
-    image: sequentialread/gotosocial:0.1.0-test12
+    image: sequentialread/gotosocial:0.1.0-test21
     restart: always
     networks:
       - internet-access
@@ -188,11 +200,11 @@ services:
       GTS_ACCOUNTS_APPROVAL_REQUIRED: 'false'
       GTS_ACCOUNTS_REASON_REQUIRED: 'false'
       GTS_LETSENCRYPT_ENABLED: 'false'
-      SSMTP_HOST: 'smtp.nullhex.com'
-      SSMTP_PORT: '587'
-      SSMTP_USERNAME: 'forest@sequentialread.com'
-      SSMTP_PASSWORD: '${NULLHEX_PASSWORD}'
-      SSMTP_FROM: 'forest@sequentialread.com'
+      GTS_SMTP_HOST: 'smtp.nullhex.com'
+      GTS_SMTP_PORT: '587'
+      GTS_SMTP_USERNAME: 'forest@sequentialread.com'
+      GTS_SMTP_PASSWORD: '${NULLHEX_PASSWORD}'
+      GTS_SMTP_FROM: 'forest@sequentialread.com'
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
@@ -222,17 +234,24 @@ services:
       sequentialread-8080-container-protocol: http
   
   goatcounter:
-    image: sequentialread/goatcounter:1.4.2-9
+    image: sequentialread/goatcounter:2.1.1-0
     restart: always
     entrypoint: ["/bin/sh"]
-    command: ["-c", "/app/goatcounter migrate -createdb all && /app/goatcounter serve -tls none -listen '*:8080'"]
+    command: ["-c", "/app/goatcounter db migrate -createdb all && /app/goatcounter serve -tls none -listen '*:8080'"]
     networks:
       sequentialread:
         ipv4_address: ${SEQUENTIALREAD_NETWORK_GOATCOUNTER_IPV4}
+    extra_hosts:
+      - "smtp.nullhex.com:${SEQUENTIALREAD_NETWORK_EXTERNAL_SERVICE_IPV4}"
+    environment:
+      - TMPDIR=/tmp/goatcounter-exports
     volumes:
       - type: bind
         source: ./goatcounter/db
         target: /app/db
+      - type: bind
+        source: ./goatcounter/exports
+        target: /tmp/goatcounter-exports
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https

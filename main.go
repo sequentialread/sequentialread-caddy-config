@@ -59,6 +59,7 @@ type ContainerConfig struct {
 	ContainerProtocol    string
 	ContainerAddress     string
 	ContainerName        string
+	ServiceName          string
 	HaProxyProxyProtocol bool
 }
 
@@ -116,8 +117,9 @@ type CaddyHandler struct {
 	StatusCode int                 `json:"status_code,omitempty"`
 
 	//CaddyFileServerHandler
-	Root        string `json:"root,omitempty"`
-	Passthrough bool   `json:"pass_thru,omitempty"`
+	Root        string   `json:"root,omitempty"`
+	Passthrough bool     `json:"pass_thru,omitempty"`
+	Hide        []string `json:"hide,omitempty"`
 }
 
 // https://caddyserver.com/docs/json/apps/http/servers/routes/handle/reverse_proxy/
@@ -243,6 +245,7 @@ func IngressConfig() error {
 					containerConfigs[container.Id] = &ContainerConfig{
 						ContainerAddress: fmt.Sprintf("%s:%d", ipAddress, port),
 						ContainerName:    container.GetShortName(),
+						ServiceName:      container.Labels["com.docker.compose.service"],
 					}
 				}
 
@@ -400,14 +403,25 @@ func IngressConfig() error {
 						match.Path = strings.Split(container.PublicPaths, ",")
 					}
 
+					staticOverrideSubfolder := container.ServiceName
+					if staticOverrideSubfolder == "" {
+						staticOverrideSubfolder = container.ContainerName
+					}
 					newRoute := CaddyRoute{
 						Handle: []CaddyHandler{
+							// this handler allows us to override specific files (like robots.txt) per container.
+							{
+								Handler:     "file_server",
+								Root:        fmt.Sprintf("%s/per-service/%s", strings.TrimSuffix(FAVICON_DIRECTORY, "/"), staticOverrideSubfolder),
+								Passthrough: true,
+							},
 							// this handler is just here to standardize the favicon (or any other universal static file)
 							// across the sites
 							{
 								Handler:     "file_server",
 								Root:        FAVICON_DIRECTORY,
 								Passthrough: true,
+								Hide:        []string{"per-service"},
 							},
 							{
 								Handler: "reverse_proxy",
