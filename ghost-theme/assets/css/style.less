@@ -335,6 +335,11 @@ code a, a code {
   color: #af148f;
 }
 
+.content pre.scroll {
+  white-space: pre;
+  overflow-x: scroll;
+}
+
 article .container,
 section .container{ background-color: #ffffff; padding: 15px; }
 section.archive-template .container,
@@ -433,6 +438,52 @@ article .content > p > img{
 
 blockquote {
   border-left: 4px solid #c5c5c5;
+}
+
+
+
+.content .chat {
+  display: flex;
+  flex-direction: row;
+  font-size: 0.9em;
+  margin-left: 1em;
+}
+
+.content .chat .username.self {
+  color: #119090;
+}
+.content .chat .username.bluepurple {
+  color: #281190;
+}
+.content .chat .username {
+  font-weight: bold;
+}
+
+.content .chat .body blockquote {
+  font-size: 15px;
+}
+
+.content .chat > img {
+  display: block;
+  border-radius: 100%;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+.content .chat.other {
+  flex-flow: row-reverse;
+}
+
+.content .content .chat.other > img {
+  margin-right: 0;
+  margin-left: 10px;
+}
+
+.content .chat.other > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .row{ margin: 0; }
