@@ -81,9 +81,33 @@ services:
       DOCKER_API_PROXY_HTTP_LISTENUNIXSOCKETGID: 165536
       DOCKER_HOST: unix:///var/run/docker.sock
       DOCKER_API_VERSION: '1.40'
+
+  gandi-dns-updater:
+    image: sequentialread/gandi-dns-updater:0.0.1
+    restart: always
+    networks:
+      - internet-access
+    environment:
+      - GDU_GANDIAPIKEY=${GREENHOUSE_GANDI_API_KEY}
+      - GDU_DOMAINS_0_DOMAIN=sequentialread.com
+      - GDU_DOMAINS_0_RECORDS_0_NAME=@
+      - GDU_DOMAINS_0_RECORDS_0_TYPE=A
+      - GDU_DOMAINS_0_RECORDS_1_NAME=*
+      - GDU_DOMAINS_0_RECORDS_1_TYPE=A
+      - GDU_DOMAINS_1_DOMAIN=server.garden
+      - GDU_DOMAINS_1_RECORDS_0_NAME=@
+      - GDU_DOMAINS_1_RECORDS_0_TYPE=A
+      - GDU_DOMAINS_1_RECORDS_1_NAME=www
+      - GDU_DOMAINS_1_RECORDS_1_TYPE=A
+      - GDU_DOMAINS_1_RECORDS_2_NAME=greenhouse
+      - GDU_DOMAINS_1_RECORDS_2_TYPE=A
+      - GDU_DOMAINS_1_RECORDS_3_NAME=www.greenhouse
+      - GDU_DOMAINS_1_RECORDS_3_TYPE=A
+      - GDU_DOMAINS_1_RECORDS_4_NAME=telemetry.greenhouse-alpha
+      - GDU_DOMAINS_1_RECORDS_4_TYPE=A
   
   greenhouse:
-    image: sequentialread/greenhouse:0.0.43
+    image: sequentialread/greenhouse:0.0.0-68998ce-b568
     restart: always
     ports: 
       - 18080:8080
@@ -259,7 +283,7 @@ services:
       sequentialread-8080-container-protocol: http
 
   goatcounter-log-publisher:
-    image: sequentialread/goatcounter:1.4.2-36
+    image: sequentialread/goatcounter:2.1.1-0
     restart: always
     entrypoint: ["/bin/sh"]
     command: ["-c", "tail -F /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com:8080 -format combined-vhost -- -"]
@@ -475,6 +499,7 @@ services:
       - "smtp.nullhex.com:${GITEA_NETWORK_EXTERNAL_SERVICE_IPV4}"
     networks:
       - gitea
+      - internet-access
     volumes:
       - type: bind
         source: ./gitea/data
@@ -517,7 +542,7 @@ services:
       SERVICE_0_DIAL: 'smtp.nullhex.com:465'
 
   gitea-registration-proxy:
-    image: sequentialread/gitea-registration-proxy:0.0.0
+    image: sequentialread/gitea-registration-proxy:0.0.1
     restart: always
     networks:
       - gitea
@@ -526,8 +551,7 @@ services:
       - DEBUG=gitea-registration-proxy
       - REGPROXY_GITEA=http://gitea:3000
       - REGPROXY_HOST=0.0.0.0
-      - REGPROXY_POWCAPTCHAAPIURL=http://captcha:2370
-      - REGPROXY_POWCAPTCHAAPITOKEN=${REGPROXY_POWCAPTCHAAPITOKEN}
+      - REGPROXY_INVITECODE=${REGPROXY_INVITECODE}
     depends_on:
       - gitea
       - captcha
@@ -619,7 +643,7 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.47
+    image: sequentialread/comments:0.1.48
     restart: always
     extra_hosts:
       - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
