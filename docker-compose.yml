@@ -505,22 +505,9 @@ services:
         source: ./gitea/data
         target: /data
     environment:
-      - APP_NAME='SequentialRead Git'
-      - UI_META_AUTHOR='Forest Johnson (SequentialRead)'
-      - UI_META_DESCRIPTION='Forest's self-hosted git server for sequentialread.com'
-      - SERVER_LANDING_PAGE='explore'
-      - SSH_PORT=10022
-      - SSH_LISTEN_PORT=10022
-      - ROOT_URL=https://git.sequentialread.com
-      - DISABLE_REGISTRATION=true
-      - INSTALL_LOCK=true
-      - SECRET_KEY=${GITEA_SECRET_KEY}
-      - DB_TYPE=postgres
-      - DB_HOST=postgres
-      - DB_NAME=gitea
-      - DB_USER=gitea
-      - DB_PASSWD=${POSTGRES_GITEA_PASSWORD}
       - GITEA_CUSTOM=/data/gitea
+      - NOTE_THAT=these environment variables only apply the first time the gitea container is started
+      - FOR_THE_REST_OF=the current config see the gitea/data/gitea/conf/app.ini file in this repository
     depends_on:
       - postgres
     labels:
