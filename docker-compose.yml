@@ -533,7 +533,6 @@ services:
     restart: always
     networks:
       - gitea
-      - blog
     environment:
       - DEBUG=gitea-registration-proxy
       - REGPROXY_GITEA=http://gitea:3000
@@ -541,7 +540,6 @@ services:
       - REGPROXY_INVITECODE=${REGPROXY_INVITECODE}
     depends_on:
       - gitea
-      - captcha
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
