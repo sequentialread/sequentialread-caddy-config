@@ -64,10 +64,13 @@ type CaddyLogRequest struct {
 }
 
 var seenRangeRequests map[string]bool
+var matchAiohttpRegexp *regexp.Regexp
 
 func main() {
 
-	seenRangeRequests := map[string]bool{}
+	matchAiohttpRegexp = regexp.MustCompile("Python/[^ ]+ aiohttp/.*")
+	seenRangeRequests = map[string]bool{}
+
 	config := loadConfigFromFileAndEnvVars()
 
 	bytez, err := json.MarshalIndent(config, "", "  ")
@@ -186,6 +189,12 @@ func main() {
 
 		isPrefetch := isbot.Prefetch(caddyLog.Request.Headers)
 		isBotResult := isbot.UserAgent(userAgent)
+
+		// isBotResult == 1: None of the rules matches, so probably not a bot
+		if isBotResult == 1 {
+			isBotResult = myIsBot(&caddyLog, userAgent)
+		}
+
 		isBotReason := getIsBotReason(isBotResult)
 		if !alwaysInclude && (isPrefetch || (isbot.Is(isBotResult))) {
 			if config.Debug {
@@ -226,7 +235,8 @@ func main() {
 		// aka connection Id
 		if caddyLog.Request.Headers["Range"] != nil && len(caddyLog.Request.Headers["Range"]) > 0 {
 			rangeRequestKey := fmt.Sprintf("%s_%s", caddyLog.Request.RemoteAddr, key)
-			if !seenRangeRequests[rangeRequestKey] {
+			_, wasSeen := seenRangeRequests[rangeRequestKey]
+			if !wasSeen {
 				seenRangeRequests[rangeRequestKey] = true
 			} else {
 				continue
@@ -312,6 +322,13 @@ func loadConfigFromFileAndEnvVars() *Config {
 	config.BlacklistIPs = parseConfigCSV(config.BlacklistIPsCSV)
 
 	return config
+}
+
+func myIsBot(caddyLog *CaddyLog, userAgent string) uint8 {
+	if matchAiohttpRegexp.MatchString(userAgent) {
+		return 4 // 4: Known client library
+	}
+	return 1
 }
 
 func getIsBotReason(code uint8) string {
