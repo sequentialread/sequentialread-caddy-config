@@ -232,6 +232,7 @@ func IngressConfig() error {
 			if len(matches) > 0 {
 				port, _ := strconv.Atoi(matches[0][1])
 				labelType := matches[0][2]
+				containerConfigId := fmt.Sprintf("%s:%d", container.Id, port)
 
 				// TODO if the container is stopped, just skip it..
 				if ipAddress == "" {
@@ -241,8 +242,8 @@ func IngressConfig() error {
 					)
 				}
 
-				if _, has := containerConfigs[container.Id]; !has {
-					containerConfigs[container.Id] = &ContainerConfig{
+				if _, has := containerConfigs[containerConfigId]; !has {
+					containerConfigs[containerConfigId] = &ContainerConfig{
 						ContainerAddress: fmt.Sprintf("%s:%d", ipAddress, port),
 						ContainerName:    container.GetShortName(),
 						ServiceName:      container.Labels["com.docker.compose.service"],
@@ -250,7 +251,7 @@ func IngressConfig() error {
 				}
 
 				if labelType == "public-protocol" {
-					containerConfigs[container.Id].PublicProtocol = value
+					containerConfigs[containerConfigId].PublicProtocol = value
 				}
 				if labelType == "public-port" {
 					port, err := strconv.Atoi(value)
@@ -260,16 +261,16 @@ func IngressConfig() error {
 							container.GetDisplayName(), value,
 						)
 					}
-					containerConfigs[container.Id].PublicPort = port
+					containerConfigs[containerConfigId].PublicPort = port
 				}
 				if labelType == "public-hostnames" {
-					containerConfigs[container.Id].PublicHostnames = value
+					containerConfigs[containerConfigId].PublicHostnames = value
 				}
 				if labelType == "public-paths" {
-					containerConfigs[container.Id].PublicPaths = value
+					containerConfigs[containerConfigId].PublicPaths = value
 				}
 				if labelType == "container-protocol" {
-					containerConfigs[container.Id].ContainerProtocol = value
+					containerConfigs[containerConfigId].ContainerProtocol = value
 				}
 			}
 		}
