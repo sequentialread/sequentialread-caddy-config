@@ -394,8 +394,10 @@ article .content .kg-card.kg-image-card {
   flex-direction: row;
   justify-content: center;
   display: flex;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  margin-right: -15px;
+  margin-left: -15px;
 } 
 
 article .content p {
@@ -409,6 +411,28 @@ article .content .kg-card .kg-image{
 article .content .kg-card.kg-width-full .kg-image{
   width: 100%;
 }
+
+article .content .kg-card.kg-image-card.kg-card-hascaption {
+  flex-direction: column;
+  background-color: #e4e4e4;
+  box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.2);
+}
+
+article .content .kg-card.kg-image-card.kg-card-hascaption .kg-image{
+  margin-right: 15px;
+  margin-left: 15px;
+}
+
+article .content .kg-card.kg-image-card.kg-card-hascaption figcaption {
+  padding-top: 1rem;
+  font-size: 15px;
+  font-family: serif;
+  font-style: italic;
+  color: #444;
+  padding-right: 2rem;
+  padding-left: 2rem;
+}
+
 
 .float-right-image {
   width: 320px; 
