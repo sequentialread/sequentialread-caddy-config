@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	envOverride "git.sequentialread.com/forest/influx-style-env-override"
 	isbot "zgo.at/isbot"
@@ -48,19 +49,37 @@ type DomainAlias struct {
 }
 
 type CaddyLog struct {
-	CommonLog       string              `json:"common_log"`
+	Timestamp       float64             `json:"ts"`
 	StatusCode      int                 `json:"status"`
+	Size            int                 `json:"size"`
 	Request         CaddyLogRequest     `json:"request"`
 	ResponseHeaders map[string][]string `json:"resp_headers"`
 }
 
 type CaddyLogRequest struct {
-	RemoteAddr string              `json:"remote_addr"`
-	URI        string              `json:"uri"`
-	Host       string              `json:"host"`
-	Proto      string              `json:"proto"`
-	Method     string              `json:"method"`
-	Headers    map[string][]string `json:"headers"`
+	RemoteIP      string              `json:"remote_ip"`
+	RemotePort    string              `json:"remote_port"`
+	RemoteAddress string              `json:"remote_addr"`
+	URI           string              `json:"uri"`
+	Host          string              `json:"host"`
+	Proto         string              `json:"proto"`
+	Method        string              `json:"method"`
+	Headers       map[string][]string `json:"headers"`
+}
+
+func (r CaddyLogRequest) GetRemoteAddress() string {
+	if r.RemoteAddress != "" {
+		return r.RemoteAddress
+	}
+	return fmt.Sprintf("%s:%s", r.RemoteIP, r.RemotePort)
+}
+
+func (r CaddyLogRequest) GetRemoteIP() string {
+	if r.RemoteIP != "" {
+		return r.RemoteIP
+	}
+	split := strings.Split(r.RemoteAddress, ":")
+	return split[0]
 }
 
 var seenRangeRequests map[string]bool
@@ -116,7 +135,7 @@ func main() {
 			for _, blacklistedURIRegex := range config.BlacklistURIRegexes {
 				if blacklistedURIRegex.MatchString(canonicalURI) {
 					if config.Debug {
-						fmt.Fprintf(os.Stderr, "%s: BlacklistURIsIgnored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+						fmt.Fprintf(os.Stderr, "%s: BlacklistURIsIgnored %s %s\n", caddyLog.Request.GetRemoteAddress(), caddyLog.Request.Host, canonicalURI)
 					}
 					return true
 				}
@@ -131,7 +150,7 @@ func main() {
 			for _, alwaysIncludeURI := range config.AlwaysIncludeURIs {
 				if canonicalURI == alwaysIncludeURI {
 					if config.Debug {
-						fmt.Fprintf(os.Stderr, "%s: alwaysInclude %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+						fmt.Fprintf(os.Stderr, "%s: alwaysInclude %s %s\n", caddyLog.Request.GetRemoteAddress(), caddyLog.Request.Host, canonicalURI)
 					}
 					return true
 				}
@@ -141,7 +160,7 @@ func main() {
 
 		if !alwaysInclude && config.GlobalContentTypeBlacklist != nil && config.GlobalContentTypeBlacklist.MatchString(contentType) {
 			if config.Debug {
-				fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; matched blacklist %s  ---  %s %s\n", caddyLog.Request.RemoteAddr, contentType, config.GlobalContentTypeBlacklistRegex, caddyLog.Request.Host, caddyLog.Request.URI)
+				fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; matched blacklist %s  ---  %s %s\n", caddyLog.Request.GetRemoteAddress(), contentType, config.GlobalContentTypeBlacklistRegex, caddyLog.Request.Host, caddyLog.Request.URI)
 			}
 			continue
 		}
@@ -164,23 +183,23 @@ func main() {
 			}
 			if !alwaysInclude && !requestDomain.ContentTypeWhitelist.MatchString(contentType) {
 				if config.Debug {
-					fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; not match %s  -----  %s %s\n", caddyLog.Request.RemoteAddr, contentType, requestDomain.ContentTypeWhitelist, caddyLog.Request.Host, caddyLog.Request.URI)
+					fmt.Fprintf(os.Stderr, "%s: ignored contentType: %s; not match %s  -----  %s %s\n", caddyLog.Request.GetRemoteAddress(), contentType, requestDomain.ContentTypeWhitelist, caddyLog.Request.Host, caddyLog.Request.URI)
 				}
 				continue
 			}
 		}
 
-		blacklistedIP := (func(remoteAddr string) bool {
+		blacklistedIP := (func(remoteIp string) bool {
 			for _, blacklistedIP := range config.BlacklistIPs {
-				if strings.HasPrefix(remoteAddr, blacklistedIP) {
+				if remoteIp == blacklistedIP {
 					if config.Debug {
-						fmt.Fprintf(os.Stderr, "%s: BlacklistIPsIgnored %s %s\n", caddyLog.Request.RemoteAddr, caddyLog.Request.Host, canonicalURI)
+						fmt.Fprintf(os.Stderr, "%s: BlacklistIPsIgnored %s %s\n", caddyLog.Request.GetRemoteAddress(), caddyLog.Request.Host, canonicalURI)
 					}
 					return true
 				}
 			}
 			return false
-		})(caddyLog.Request.RemoteAddr)
+		})(caddyLog.Request.GetRemoteIP())
 		if blacklistedIP {
 			continue
 		}
@@ -198,7 +217,7 @@ func main() {
 		isBotReason := getIsBotReason(isBotResult)
 		if !alwaysInclude && (isPrefetch || (isbot.Is(isBotResult))) {
 			if config.Debug {
-				fmt.Fprintf(os.Stderr, "%s: ignored cuz bot: userAgent: %s  isPrefetch: %t, isBotReason: %s\n", caddyLog.Request.RemoteAddr, userAgent, isPrefetch, isBotReason)
+				fmt.Fprintf(os.Stderr, "%s: ignored cuz bot: userAgent: %s  isPrefetch: %t, isBotReason: %s\n", caddyLog.Request.GetRemoteAddress(), userAgent, isPrefetch, isBotReason)
 			}
 			continue
 		}
@@ -234,7 +253,7 @@ func main() {
 		// don't treat each individual http range request as a separate hit. group them by goatcounter key and remote address
 		// aka connection Id
 		if caddyLog.Request.Headers["Range"] != nil && len(caddyLog.Request.Headers["Range"]) > 0 {
-			rangeRequestKey := fmt.Sprintf("%s_%s", caddyLog.Request.RemoteAddr, key)
+			rangeRequestKey := fmt.Sprintf("%s_%s", caddyLog.Request.GetRemoteAddress(), key)
 			_, wasSeen := seenRangeRequests[rangeRequestKey]
 			if !wasSeen {
 				seenRangeRequests[rangeRequestKey] = true
@@ -243,16 +262,30 @@ func main() {
 			}
 		}
 
-		search := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, caddyLog.Request.URI, caddyLog.Request.Proto)
-		replace := fmt.Sprintf("\"%s %s %s\"", caddyLog.Request.Method, key, caddyLog.Request.Proto)
+		// 	"ts": 1651382931.1353872,
+		dateTime := time.Unix(int64(caddyLog.Timestamp), 0)
+		nginxCommonLogTimestamp := dateTime.Format("02/Jan/2006:15:04:05 -0700")
 
-		myCommonLog := strings.Replace(caddyLog.CommonLog, search, replace, 1)
+		// "192.168.0.1 - - [01/May/2022:05:35:05 +0000] \"GET / HTTP/2.0\" 200 13051"
+		myCommonLog := fmt.Sprintf(
+			"%s - - [%s] \"%s %s %s\" %d %d",
+			caddyLog.Request.GetRemoteIP(), nginxCommonLogTimestamp,
+			caddyLog.Request.Method, key, caddyLog.Request.Proto,
+			caddyLog.StatusCode, caddyLog.Size,
+		)
 
+		// https://nginx.org/en/docs/http/ngx_http_log_module.html
+		// log_format compression '$remote_addr - $remote_user [$time_local] '
+		//                        '"$request" $status $bytes_sent '
+		//                        '"$http_referer" "$http_user_agent" "$gzip_ratio"';
+
+		// Example:
+		// git.sequentialread.com:"51.222.253.14 - - [01/May/2022:05:34:57 +0000] \"GET /git.sqr/forest/ HTTP/2.0\" 200 17310" "https://some.referrer" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0"
 		toPrint := fmt.Sprintf("%s:%s \"%s\" \"%s\"\n", caddyLog.Request.Host, myCommonLog, referer, userAgent)
 
 		fmt.Fprintf(os.Stdout, toPrint)
 		if config.Debug {
-			fmt.Fprintf(os.Stderr, "%s: %s matched %s: isBotReason: %s %s", caddyLog.Request.RemoteAddr, contentType, contentTypeWhitelistForDebugLog, isBotReason, toPrint)
+			fmt.Fprintf(os.Stderr, "%s: %s matched %s: isBotReason: %s %s", caddyLog.Request.GetRemoteAddress(), contentType, contentTypeWhitelistForDebugLog, isBotReason, toPrint)
 		} else {
 			fmt.Fprintf(os.Stderr, "%s matched %s: isBotReason: %s %s", contentType, contentTypeWhitelistForDebugLog, isBotReason, toPrint)
 		}
