@@ -371,10 +371,10 @@ func IngressConfig() error {
 
 			// sort them so that the json always comes out the same & easier to compare (canonical)
 			// also include the ones that specify a path first so they take precidence when two handlers match the same domain
-			getShortestPathLength := func(paths []string) int {
+			getShortestPathLength := func(paths []string, separator string) int {
 				shortest := 255
 				for _, path := range paths {
-					result := len(strings.Split(path, "/"))
+					result := len(strings.Split(path, separator))
 					if result < shortest {
 						shortest = result
 					}
@@ -382,16 +382,11 @@ func IngressConfig() error {
 				return shortest
 			}
 			sort.Slice(containerConfigs, func(i, j int) bool {
-				sortI := fmt.Sprintf(
-					"%s%s",
-					string(rune(255-getShortestPathLength(strings.Split(containerConfigs[i].PublicPaths, ",")))),
-					containerConfigs[i].ContainerName,
-				)
-				sortJ := fmt.Sprintf(
-					"%s%s",
-					string(rune(255-getShortestPathLength(strings.Split(containerConfigs[j].PublicPaths, ",")))),
-					containerConfigs[j].ContainerName,
-				)
+				pathLengthI := getShortestPathLength(strings.Split(containerConfigs[i].PublicPaths, ","), "/")
+				sortI := fmt.Sprintf("%s.%s", string(rune(255-pathLengthI)), containerConfigs[i].ContainerAddress)
+
+				pathLengthJ := getShortestPathLength(strings.Split(containerConfigs[j].PublicPaths, ","), "/")
+				sortJ := fmt.Sprintf("%s.%s", string(rune(255-pathLengthJ)), containerConfigs[j].ContainerAddress)
 				return sortI < sortJ
 			})
 
