@@ -490,7 +490,7 @@ services:
 
 
   gitea:
-    image: sequentialread/gitea-armv7:1.13.2 
+    image: sequentialread/gitea-armv7:1.16.7-3
     restart: always
     mem_limit: 1400m
     ports:
@@ -505,9 +505,22 @@ services:
         source: ./gitea/data
         target: /data
     environment:
+      - APP_NAME='SequentialRead Git'
+      - UI_META_AUTHOR='Forest Johnson (SequentialRead)'
+      - UI_META_DESCRIPTION='Forest's self-hosted git server for sequentialread.com'
+      - SERVER_LANDING_PAGE='explore'
+      - SSH_PORT=10022
+      - SSH_LISTEN_PORT=10022
+      - ROOT_URL=https://git.sequentialread.com
+      - DISABLE_REGISTRATION=true
+      - INSTALL_LOCK=true
+      - SECRET_KEY=${GITEA_SECRET_KEY}
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_NAME=gitea
+      - DB_USER=gitea
+      - DB_PASSWD=${POSTGRES_GITEA_PASSWORD}
       - GITEA_CUSTOM=/data/gitea
-      - NOTE_THAT=these environment variables only apply the first time the gitea container is started
-      - FOR_THE_REST_OF=the current config see the gitea/data/gitea/conf/app.ini file in this repository
     depends_on:
       - postgres
     labels:
@@ -533,6 +546,7 @@ services:
     restart: always
     networks:
       - gitea
+      - blog
     environment:
       - DEBUG=gitea-registration-proxy
       - REGPROXY_GITEA=http://gitea:3000
@@ -540,6 +554,7 @@ services:
       - REGPROXY_INVITECODE=${REGPROXY_INVITECODE}
     depends_on:
       - gitea
+      - captcha
     labels:
       sequentialread-8080-public-port: 443
       sequentialread-8080-public-protocol: https
@@ -555,12 +570,43 @@ services:
     volumes:
       - type: bind
         source: ./postgres/data
-        target: /var/lib/postgres
+        target: /var/lib/postgresql/data
       - type: bind
         source: ./postgres/init/
         target: /docker-entrypoint-initdb.d
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD}
+
+  radicale:
+    image: tomsquest/docker-radicale
+    networks:
+      - sequentialread
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - KILL
+    healthcheck:
+      test: curl -f http://127.0.0.1:5232 || exit 1
+      interval: 30s
+      retries: 3
+    restart: unless-stopped
+    volumes:
+      - ./radicale/data:/data
+      - ./radicale/config:/config:ro
+      - ./radicale/etc-radicale:/etc/radicale
+    labels:
+      sequentialread-5232-public-port: 443
+      sequentialread-5232-public-protocol: https
+      sequentialread-5232-public-hostnames: "radicale.sequentialread.com"
+      sequentialread-5232-container-protocol: http
+
 
   ghost:
     image: ghost:3.41-alpine
@@ -729,5 +775,4 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
 
