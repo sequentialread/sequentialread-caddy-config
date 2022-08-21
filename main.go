@@ -217,9 +217,7 @@ func IngressConfig() error {
 	for _, container := range containers {
 		ipAddresses := []string{}
 		for _, containerNetwork := range container.NetworkSettings.Networks {
-			// TODO filter this to only networks that the caddy container has access to?
 			ipAddresses = append(ipAddresses, containerNetwork.IPAddress)
-			break
 		}
 		sort.Strings(ipAddresses)
 		ipAddress := ipAddresses[0]
