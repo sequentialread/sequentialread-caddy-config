@@ -215,12 +215,15 @@ func IngressConfig() error {
 	containerConfigs := map[string]*ContainerConfig{}
 
 	for _, container := range containers {
-		ipAddress := ""
+		ipAddresses := []string{}
 		for _, containerNetwork := range container.NetworkSettings.Networks {
 			// TODO filter this to only networks that the caddy container has access to?
-			ipAddress = containerNetwork.IPAddress
+			ipAddresses = append(ipAddresses, containerNetwork.IPAddress)
 			break
 		}
+		sort.Strings(ipAddresses)
+		ipAddress := ipAddresses[0]
+
 		for key, value := range container.Labels {
 			matches := ingressLabelRegexp.FindAllStringSubmatch(key, -1)
 			if strings.HasPrefix(key, "sequentialread") && len(matches) == 0 {

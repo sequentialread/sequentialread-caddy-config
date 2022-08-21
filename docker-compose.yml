@@ -32,7 +32,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.16-ece49ee-777d
+    image: sequentialread/caddy-config:0.0.17-779ddfa-2f70
     restart: always
     #mem_limit: 50m
     networks:
@@ -162,12 +162,15 @@ services:
   loki:
     image: grafana/loki:main-c4562f1
     restart: always
+    ports:
+      - 3212:3100
     networks:
+      - internet-access
       - sequentialread
     volumes:
       - type: bind
         source: ./loki/data
-        target: /loki
+        target: /tmp/loki
       - type: bind
         source: ./loki/config.yml
         target: /etc/loki/local-config.yaml
@@ -438,7 +441,7 @@ services:
       #SERVICE_1_DIAL: '192.168.0.46:8080'
 
   pwm:
-    image: sequentialread/sequentialread-password-manager:2.0.6
+    image: sequentialread/sequentialread-password-manager:2.0.10
     restart: always
     networks:
       - sequentialread
@@ -505,22 +508,9 @@ services:
         source: ./gitea/data
         target: /data
     environment:
-      - APP_NAME='SequentialRead Git'
-      - UI_META_AUTHOR='Forest Johnson (SequentialRead)'
-      - UI_META_DESCRIPTION='Forest's self-hosted git server for sequentialread.com'
-      - SERVER_LANDING_PAGE='explore'
-      - SSH_PORT=10022
-      - SSH_LISTEN_PORT=10022
-      - ROOT_URL=https://git.sequentialread.com
-      - DISABLE_REGISTRATION=true
-      - INSTALL_LOCK=true
-      - SECRET_KEY=${GITEA_SECRET_KEY}
-      - DB_TYPE=postgres
-      - DB_HOST=postgres
-      - DB_NAME=gitea
-      - DB_USER=gitea
-      - DB_PASSWD=${POSTGRES_GITEA_PASSWORD}
       - GITEA_CUSTOM=/data/gitea
+      - NOTE_THAT=these environment variables only apply the first time the gitea container is started
+      - FOR_THE_REST_OF=the current config see the gitea/data/gitea/conf/app.ini file in this repository
     depends_on:
       - postgres
     labels:
@@ -775,4 +765,3 @@ networks:
 
 volumes:
   caddy-socket-volume:
-
