@@ -32,7 +32,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.17-779ddfa-2f70
+    image: sequentialread/caddy-config:0.0.17-e0816c4-edac
     restart: always
     #mem_limit: 50m
     networks:
