@@ -162,8 +162,6 @@ services:
   loki:
     image: grafana/loki:main-c4562f1
     restart: always
-    ports:
-      - 3212:3100
     networks:
       - internet-access
       - sequentialread
