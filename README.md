@@ -4,12 +4,12 @@
 This repository contains two things,
 
 1. The **`docker-compose.yml`** file which holds all the services I run on my personal website.
-  * _[Server & Website Updates](https://sequentialread.com/website-updates/)_
-  * _[Creating a Simple but Effective Outbound "Firewall" using Vanilla Docker-Compose](https://sequentialread.com/creating-a-simple-but-effective-firewall-using-vanilla-docker-compose/)_
-  * _[Docker API Security Gateway Proof Of Concept](https://sequentialread.com/docker-api-security-gateway/)_
+    * _[Server & Website Updates](https://sequentialread.com/website-updates/)_
+    * _[Creating a Simple but Effective Outbound "Firewall" using Vanilla Docker-Compose](https://sequentialread.com/creating-a-simple-but-effective-firewall-using-vanilla-docker-compose/)_
+    * _[Docker API Security Gateway Proof Of Concept](https://sequentialread.com/docker-api-security-gateway/)_
 2. An application that talks to the docker socket to get info about containers and then generates a Caddy config, which it posts to Caddy 2 HTTP server. 
-  * This is similar to https://traefik.io/ or https://github.com/nginx-proxy/nginx-proxy
-  * Yes I realize https://github.com/lucaslorentz/caddy-docker-proxy already does this :P
+    * This is similar to https://traefik.io/ or https://github.com/nginx-proxy/nginx-proxy
+    * Yes I realize https://github.com/lucaslorentz/caddy-docker-proxy already does this :P
 
 I am making my own instead for a couple reasons: 
 
