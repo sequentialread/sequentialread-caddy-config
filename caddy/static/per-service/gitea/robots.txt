@@ -1,10 +1,10 @@
 User-agent: *
 Allow: /
 Disallow: /*/commit/*
+Disallow: /*/archive/*
+Disallow: /*/raw/*
 Disallow: /*/commits/*
-Disallow: /*/src/branch/*
-Disallow: /*/src/tag/*
+Disallow: /*/src/*
 Disallow: /*/compare/*
-Disallow: /*/search
-
-
+Disallow: /*/search*
+Disallow: /*/info/refs*
