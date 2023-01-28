@@ -2,14 +2,16 @@
 # sequentialread-caddy-config
 
 This application talks to the docker socket to get info about containers and then
-generates a Caddy config, which it posts to Caddy 2 HTTP server (by Matt Holt, of Let's Encrypt fame).
+generates a Caddy config, which it posts to Caddy 2 HTTP server. 
+
+This is similar to https://traefik.io/ or https://github.com/nginx-proxy/nginx-proxy
 
 Yes I realize https://github.com/lucaslorentz/caddy-docker-proxy already does this :P 
 
 I am making my own instead for a couple reasons: 
 
-1. I'm going to give it access to the docker socket so I'd prefer to know the code well.
-2. I already created most of it for the [ingress controller part of rootsystem](https://git.sequentialread.com/forest/rootsystem/src/master/automation/ingressController.go). 
+1. I don't like the template-based solutions because they are harder to debug. One typically cannot put breakpoints or print statements inside a large complicated template file. 
+2. I had already written code that generates Caddy configs for some of my other projects. This is the code that eventually became  [greenhouse-daemon](https://git.sequentialread.com/sqr/greenhouse-daemon/src/commit/c563be03d35ee5d56d040ae7a3a1ca455bb79d92/config_service.go). 
 
 
 Example docker labels to configure a container to be served publically:
