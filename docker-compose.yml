@@ -89,6 +89,7 @@ services:
       - internet-access
     environment:
       - GDU_GANDIAPIKEY=${GREENHOUSE_GANDI_API_KEY}
+      - GDU_RESETAFTERCONSECUTIVEFAILURES=3
       - GDU_DOMAINS_0_DOMAIN=sequentialread.com
       - GDU_DOMAINS_0_RECORDS_0_NAME=@
       - GDU_DOMAINS_0_RECORDS_0_TYPE=A
@@ -107,7 +108,7 @@ services:
       - GDU_DOMAINS_1_RECORDS_4_TYPE=A
   
   greenhouse:
-    image: sequentialread/greenhouse:0.0.0-68998ce-b568
+    image: sequentialread/greenhouse:0.0.0-eee7d07-4608
     restart: always
     ports: 
       - 18080:8080
@@ -201,7 +202,7 @@ services:
 
   
   gotosocial:
-    image: sequentialread/gotosocial:0.1.0-test21
+    image: sequentialread/gotosocial:45ae71
     restart: always
     networks:
       - internet-access
@@ -306,7 +307,7 @@ services:
       - LOGADAPTER_DEBUG=false
       - LOGADAPTER_ALWAYSINCLUDEURISCSV=,
       - LOGADAPTER_BLACKLISTIPSCSV=192.168.0.1,192.168.0.46,97.116.20.61,185.12.148.78
-      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments)\.)?(beta\.)?sequentialread.com
+      - LOGADAPTER_DOMAINS_0_MATCHHOSTNAMEREGEX=^(www\.)?((grafana|git|stream|pwm|captcha|comments|gotosocial)\.)?(beta\.)?sequentialread.com
       - LOGADAPTER_DOMAINS_0_CONTENTTYPEWHITELISTREGEX=[^/]+/html
       - LOGADAPTER_DOMAINS_1_MATCHHOSTNAMEREGEX=^(www\.)?(greenhouse(-alpha)?\.)?server.garden
       - LOGADAPTER_DOMAINS_1_CONTENTTYPEWHITELISTREGEX=[^/]+/html
@@ -435,8 +436,13 @@ services:
       DEBUG_LOG: 'true'
       SERVICE_0_LISTEN: ':465'
       SERVICE_0_DIAL: 'smtp.nullhex.com:465'
-      #SERVICE_1_LISTEN: ':8080'
-      #SERVICE_1_DIAL: '192.168.0.46:8080'
+      SERVICE_1_LISTEN: ':8226'
+      SERVICE_1_DIAL: '192.168.0.140:8226'
+    labels:
+      sequentialread-8226-public-port: 443
+      sequentialread-8226-public-protocol: https
+      sequentialread-8226-public-hostnames: "mixtape.sequentialread.com"
+      sequentialread-8226-container-protocol: http
 
   pwm:
     image: sequentialread/sequentialread-password-manager:2.0.10
@@ -459,7 +465,7 @@ services:
       sequentialread-8073-container-protocol: http
 
   picopublish:
-    image: sequentialread/picopublish:0.2.3-test3
+    image: sequentialread/picopublish:0.2.44-corstest
     restart: always
     networks:
       - blog
@@ -662,11 +668,11 @@ services:
 
 
   comments:
-    image: sequentialread/comments:0.1.48
+    image: sequentialread/comments:0.1.50
     restart: always
     extra_hosts:
       - "smtp.nullhex.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
-      - "captcha.sequentialread.com:${BLOG_NETWORK_EXTERNAL_SERVICE_IPV4}"
+      - "www.gravatar.com:${BLOG_NETWORK_EXTERNAL_SERVICE2_IPV4}"
     networks:
       - blog
     volumes:
@@ -712,6 +718,19 @@ services:
       SERVICE_2_DIAL: '192.168.0.46:445'
       SERVICE_3_LISTEN: ':139'
       SERVICE_3_DIAL: '192.168.0.46:139'
+
+  blog-external-service2:
+    image: sequentialread/external-service:0.0.14
+    restart: always
+    networks:
+      blog:
+        ipv4_address: ${BLOG_NETWORK_EXTERNAL_SERVICE2_IPV4}
+      internet-access:
+    environment:
+      DEBUG_LOG: 'true'
+      SERVICE_1_LISTEN: ':443'
+      SERVICE_1_DIAL: 'www.gravatar.com:443'
+
 
   captcha:
     image: sequentialread/pow-captcha:0.0.13
