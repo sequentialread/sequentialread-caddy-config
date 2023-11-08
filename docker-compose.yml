@@ -314,6 +314,34 @@ services:
       - LOGADAPTER_DOMAINS_2_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_2_CONTENTTYPEWHITELISTREGEX=DROP_ALL
 
+  # the admin, telegraf, and grafana users on this influxdb were set up manually
+  # the passwords/tokens in .env
+  # also, had to manually create the dbrp afterwards, for v1 compatibility:
+  # curl -H "Authorization: Token $INFLUXDB2_ADMIN_TOKEN" -X POST https://influxdb2.sequentialread.com/api/v2/dbrps -d '{
+  #     "bucketID": "582ef43b7a3c3b39",
+  #     "database": "sequentialread",
+  #     "default": true,
+  #     "org": "sequentialread",
+  #     "retention_policy": "autogen"
+  # }'
+  influxdb2:
+    image: sequentialread/influxdb:2.1.1-armv7
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./influxdb2/
+        target: /root/.influxdbv2
+    environment:
+      - INFLUXD_REPORTING_DISABLED=true
+      - INFLUXD_PPROF_DISABLED=true
+    labels:
+      sequentialread-8086-public-port: 443
+      sequentialread-8086-public-protocol: https
+      sequentialread-8086-public-hostnames: "influxdb2.sequentialread.com"
+      sequentialread-8086-container-protocol: http
+
   influxdb:
     image: influxdb:1.8.4
     restart: always
