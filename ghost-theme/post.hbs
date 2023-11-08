@@ -4,10 +4,20 @@
 
     <div class="container limit-width">
         <div class="page-header">
-            <h1>{{title}}</h1>
-            By {{author}} On <time>{{date}}</time>
+          <h1>{{title}}</h1>
+          By 
+          {{#foreach authors}}
+            <a href="{{url}}" class="author-avatar">
+              <img class="author-profile-image" src="{{img_url profile_image size="xs"}}" alt="{{name}}" />
+            </a>
+          {{/foreach}}
+          {{authors}} On <time>{{date}}</time>
+          {{#if reading_time}}
+              <br/>
+              <span class="byline-reading-time">{{reading_time}}</span>
+          {{/if}}
         </div>
-
+        
 		<div class="content">
 			{{content}}
 		</div>
