@@ -21,6 +21,7 @@ import (
 
 type DockerContainer struct {
 	Id              string
+	State           string
 	Names           []string
 	Labels          map[string]string
 	NetworkSettings DockerContainerNetworkSettings
@@ -215,6 +216,12 @@ func IngressConfig() error {
 	containerConfigs := map[string]*ContainerConfig{}
 
 	for _, container := range containers {
+
+		// Ignore non-running containers :)
+		if strings.ToLower(container.State) != "running" {
+			continue
+		}
+
 		ipAddresses := []string{}
 		for _, containerNetwork := range container.NetworkSettings.Networks {
 			ipAddresses = append(ipAddresses, containerNetwork.IPAddress)
@@ -502,7 +509,7 @@ func byteArraysEqual(a, b []byte) bool {
 	return true
 }
 
-//https://docs.docker.com/engine/api/v1.40/#tag/Container
+// https://docs.docker.com/engine/api/v1.40/#tag/Container
 func ListDockerContainers() ([]DockerContainer, error) {
 	bytes, err := myDockerGet("containers/json?all=true")
 	if err != nil {

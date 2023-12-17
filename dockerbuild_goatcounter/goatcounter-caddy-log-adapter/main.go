@@ -191,7 +191,7 @@ func main() {
 
 		blacklistedIP := (func(remoteIp string) bool {
 			for _, blacklistedIP := range config.BlacklistIPs {
-				if remoteIp == blacklistedIP {
+				if remoteIp == blacklistedIP || strings.HasPrefix(caddyLog.Request.GetRemoteIP(), blacklistedIP) {
 					if config.Debug {
 						fmt.Fprintf(os.Stderr, "%s: BlacklistIPsIgnored %s %s\n", caddyLog.Request.GetRemoteAddress(), caddyLog.Request.Host, canonicalURI)
 					}
@@ -358,6 +358,10 @@ func loadConfigFromFileAndEnvVars() *Config {
 }
 
 func myIsBot(caddyLog *CaddyLog, userAgent string) uint8 {
+	// AS45102 - 47.76.0.0/17 - Alibaba (US) Technology Co., Ltd, proud hosters of sneaky bots
+	if strings.HasPrefix(caddyLog.Request.GetRemoteIP(), "47.76") {
+		return 16 // 16: alibaba cloud
+	}
 	if matchAiohttpRegexp.MatchString(userAgent) {
 		return 4 // 4: Known client library
 	}
@@ -374,6 +378,12 @@ func getIsBotReason(code uint8) string {
 		5:   "Known bot",
 		6:   "User-Agent string looks \"bot-ish\"",
 		7:   "User-Agent string is short",
+		8:   "AWS",
+		9:   "DigitalOcean",
+		10:  "servers.com",
+		11:  "Google Cloud",
+		12:  "hetzner.de",
+		16:  "Alibaba Cloud",
 		150: "PhantomJS headless browser",
 		151: "Nightmare headless browser",
 		152: "Selenium headless browser",

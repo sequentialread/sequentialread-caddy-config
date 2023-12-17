@@ -1,6 +1,11 @@
 #!/bin/bash -e
 
-VERSION="2.1.1-1"
+cd goatcounter-caddy-log-adapter
+rm goatcounter-caddy-log-adapter
+GOARCH=arm GOOS=linux go build -o goatcounter-caddy-log-adapter .
+cd ../
+
+VERSION="2.1.1-3"
 
 rm -rf dockerbuild || true
 mkdir dockerbuild

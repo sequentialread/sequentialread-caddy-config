@@ -33,7 +33,7 @@ services:
         target: /caddysocket
 
   caddy-config:
-    image: sequentialread/caddy-config:0.0.17-e0816c4-edac
+    image: sequentialread/caddy-config:0.0.17-11b555a-2ff4
     restart: always
     #mem_limit: 50m
     networks:
@@ -286,7 +286,7 @@ services:
       sequentialread-8080-container-protocol: http
 
   goatcounter-log-publisher:
-    image: sequentialread/goatcounter:2.1.1-0
+    image: sequentialread/goatcounter:2.1.1-2
     restart: always
     entrypoint: ["/bin/sh"]
     command: ["-c", "tail -F /caddylog/caddy-goatcounter.log | ./goatcounter-caddy-log-adapter  | ./goatcounter import -site http://goatcounter.sequentialread.com:8080 -format combined-vhost -- -"]
@@ -315,6 +315,26 @@ services:
       - LOGADAPTER_DOMAINS_2_MATCHHOSTNAMEREGEX=(goatcounter|influxdb)
       - LOGADAPTER_DOMAINS_2_CONTENTTYPEWHITELISTREGEX=DROP_ALL
 
+  influxdb:
+    image: ghcr.io/terjesannum/influxdb-arm32:1.8.10-1
+    restart: always
+    networks:
+      - sequentialread
+    volumes:
+      - type: bind
+        source: ./influxdb/data/
+        target: /var/lib/influxdb
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
+      - INFLUXDB_HTTP_AUTH_ENABLED=true
+      - INFLUXDB_HTTP_PPROF_AUTH_ENABLED=true
+      - INFLUXDB_HTTP_DEBUG_PPROF_ENABLED=true
+    labels:
+      sequentialread-8086-public-port: 443
+      sequentialread-8086-public-protocol: https
+      sequentialread-8086-public-hostnames: "influxdb.sequentialread.com,influxdb.beta.sequentialread.com"
+      sequentialread-8086-container-protocol: http
+
   # the admin, telegraf, and grafana users on this influxdb were set up manually
   # the passwords/tokens in .env
   # also, had to manually create the dbrp afterwards, for v1 compatibility:
@@ -325,23 +345,23 @@ services:
   #     "org": "sequentialread",
   #     "retention_policy": "autogen"
   # }'
-  influxdb2:
-    image: sequentialread/influxdb:2.1.1-armv7
-    restart: always
-    networks:
-      - sequentialread
-    volumes:
-      - type: bind
-        source: ./influxdb2/
-        target: /root/.influxdbv2
-    environment:
-      - INFLUXD_REPORTING_DISABLED=true
-      - INFLUXD_PPROF_DISABLED=true
-    labels:
-      sequentialread-8086-public-port: 443
-      sequentialread-8086-public-protocol: https
-      sequentialread-8086-public-hostnames: "influxdb2.sequentialread.com"
-      sequentialread-8086-container-protocol: http
+  # influxdb2:
+  #   image: sequentialread/influxdb:2.1.1-armv7
+  #   restart: always
+  #   networks:
+  #     - sequentialread
+  #   volumes:
+  #     - type: bind
+  #       source: ./influxdb2/
+  #       target: /root/.influxdbv2
+  #   environment:
+  #     - INFLUXD_REPORTING_DISABLED=true
+  #     - INFLUXD_PPROF_DISABLED=true
+  #   labels:
+  #     sequentialread-8086-public-port: 443
+  #     sequentialread-8086-public-protocol: https
+  #     sequentialread-8086-public-hostnames: "influxdb2.sequentialread.com"
+  #     sequentialread-8086-container-protocol: http
 
   telegraf: 
     image: telegraf:1.17.3
@@ -387,6 +407,8 @@ services:
       - HOST_MOUNT_PREFIX=/hostfs
       - HOST_PROC=/hostfs/proc
       - TELEGRAF_DOCKER_SOCKET=/dockersocket/docker.sock
+      - TELEGRAF_INFLUX_PASSWORD=${TELEGRAF_INFLUX_PASSWORD}
+      - TELEGRAF_INFLUX_URL=https://influxdb.sequentialread.com
       - TELEGRAF_INFLUX2_TOKEN=${TELEGRAF_INFLUX2_TOKEN}
       - TELEGRAF_INFLUX2_URL=https://influxdb2.sequentialread.com
 
